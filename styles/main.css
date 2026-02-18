@@ -299,8 +299,34 @@ button.ghost {
 }
 
 .square .piece {
-    filter: drop-shadow(0 8px 8px rgba(0,0,0,0.3));
+    font-size: 38px;
+    line-height: 1;
+    display: block;
     pointer-events: none;
+    user-select: none;
+    transition: transform 0.1s ease;
+}
+
+/* White pieces — ivory fill, crisp dark outline on every theme */
+.square .piece-w {
+    color: var(--pw-color, #f5f2e8);
+    text-shadow:
+        1px  1px 0 var(--pw-stroke, #1a1a2a),
+       -1px -1px 0 var(--pw-stroke, #1a1a2a),
+        1px -1px 0 var(--pw-stroke, #1a1a2a),
+       -1px  1px 0 var(--pw-stroke, #1a1a2a),
+        0    2px 5px rgba(0,0,0,0.55);
+}
+
+/* Black pieces — deep fill, light halo so they pop on bright squares */
+.square .piece-b {
+    color: var(--pb-color, #1c1830);
+    text-shadow:
+        1px  1px 0 var(--pb-stroke, rgba(255,255,255,0.55)),
+       -1px -1px 0 var(--pb-stroke, rgba(255,255,255,0.55)),
+        1px -1px 0 var(--pb-stroke, rgba(255,255,255,0.55)),
+       -1px  1px 0 var(--pb-stroke, rgba(255,255,255,0.55)),
+        0    2px 5px rgba(0,0,0,0.45);
 }
 
 .square.highlight-move::after {
@@ -408,14 +434,87 @@ button.ghost {
     }
 }
 
-/* Board theme swatches */
-.theme-0 { --light-square: #f7f8fc; --dark-square: #cad1e5; --accent-strong: #5ad0ff; --accent-soft: rgba(90,208,255,0.18); }
-.theme-1 { --light-square: #f8f0df; --dark-square: #d8b889; --accent-strong: #ffb347; --accent-soft: rgba(255,179,71,0.22); }
-.theme-2 { --light-square: #e7fff3; --dark-square: #9de5c2; --accent-strong: #46d681; --accent-soft: rgba(70,214,129,0.18); }
-.theme-3 { --light-square: #ffeef5; --dark-square: #f3a6cd; --accent-strong: #ff6fbd; --accent-soft: rgba(255,111,189,0.18); }
-.theme-4 { --light-square: #f2f7ff; --dark-square: #9fbdfc; --accent-strong: #6f8bff; --accent-soft: rgba(111,139,255,0.2); }
-.theme-5 { --light-square: #f9f2ff; --dark-square: #c9a6f7; --accent-strong: #b073ff; --accent-soft: rgba(176,115,255,0.2); }
-.theme-6 { --light-square: #eef6f7; --dark-square: #89b6c4; --accent-strong: #49c1ff; --accent-soft: rgba(73,193,255,0.16); }
-.theme-7 { --light-square: #f7f3ef; --dark-square: #c7b09d; --accent-strong: #e5c08c; --accent-soft: rgba(229,192,140,0.2); }
-.theme-8 { --light-square: #f6fff7; --dark-square: #b5f0c2; --accent-strong: #7be495; --accent-soft: rgba(123,228,149,0.2); }
-.theme-9 { --light-square: #f6f7fb; --dark-square: #bfc2d7; --accent-strong: #9aa4ff; --accent-soft: rgba(154,164,255,0.2); }
+/* ── Board theme swatches ───────────────────────────────────────────────
+   Each theme sets square colours, accent colours, and overrides
+   piece fill / stroke so pieces are always readable on that palette.
+──────────────────────────────────────────────────────────────────────── */
+
+/* 0 · Polished Quartz (cool grey-blue) */
+.theme-0 {
+    --light-square: #f7f8fc; --dark-square: #cad1e5;
+    --accent-strong: #5ad0ff; --accent-soft: rgba(90,208,255,0.18);
+    --pw-color: #ffffff; --pw-stroke: #2a2a40;
+    --pb-color: #1e1e38; --pb-stroke: rgba(255,255,255,0.6);
+}
+
+/* 1 · Amberwood (warm honey-brown) */
+.theme-1 {
+    --light-square: #f8f0df; --dark-square: #d8b889;
+    --accent-strong: #ffb347; --accent-soft: rgba(255,179,71,0.22);
+    --pw-color: #fff8e7; --pw-stroke: #3d1c02;
+    --pb-color: #2b0f00; --pb-stroke: rgba(255,230,180,0.65);
+}
+
+/* 2 · Mint Crest (fresh green) */
+.theme-2 {
+    --light-square: #e7fff3; --dark-square: #9de5c2;
+    --accent-strong: #46d681; --accent-soft: rgba(70,214,129,0.18);
+    --pw-color: #f4fff9; --pw-stroke: #0d2b1a;
+    --pb-color: #0d2b1a; --pb-stroke: rgba(200,255,225,0.6);
+}
+
+/* 3 · Blush Silk (soft pink) */
+.theme-3 {
+    --light-square: #ffeef5; --dark-square: #f3a6cd;
+    --accent-strong: #ff6fbd; --accent-soft: rgba(255,111,189,0.18);
+    --pw-color: #fff0f7; --pw-stroke: #5a0030;
+    --pb-color: #3b0020; --pb-stroke: rgba(255,210,235,0.65);
+}
+
+/* 4 · Polar Sky (periwinkle-blue) */
+.theme-4 {
+    --light-square: #f2f7ff; --dark-square: #9fbdfc;
+    --accent-strong: #6f8bff; --accent-soft: rgba(111,139,255,0.2);
+    --pw-color: #eef4ff; --pw-stroke: #18215c;
+    --pb-color: #101840; --pb-stroke: rgba(210,225,255,0.6);
+}
+
+/* 5 · Violet Crown (lavender-purple) */
+.theme-5 {
+    --light-square: #f9f2ff; --dark-square: #c9a6f7;
+    --accent-strong: #b073ff; --accent-soft: rgba(176,115,255,0.2);
+    --pw-color: #fbf4ff; --pw-stroke: #2e0050;
+    --pb-color: #220040; --pb-stroke: rgba(240,210,255,0.6);
+}
+
+/* 6 · Glacier Fade (teal-grey) */
+.theme-6 {
+    --light-square: #eef6f7; --dark-square: #89b6c4;
+    --accent-strong: #49c1ff; --accent-soft: rgba(73,193,255,0.16);
+    --pw-color: #f0fafc; --pw-stroke: #0d2d38;
+    --pb-color: #062030; --pb-stroke: rgba(195,235,245,0.6);
+}
+
+/* 7 · Champagne (warm taupe) */
+.theme-7 {
+    --light-square: #f7f3ef; --dark-square: #c7b09d;
+    --accent-strong: #e5c08c; --accent-soft: rgba(229,192,140,0.2);
+    --pw-color: #fffbf5; --pw-stroke: #3a2510;
+    --pb-color: #2a180a; --pb-stroke: rgba(255,240,210,0.6);
+}
+
+/* 8 · Garden Glass (bright sage) */
+.theme-8 {
+    --light-square: #f6fff7; --dark-square: #b5f0c2;
+    --accent-strong: #7be495; --accent-soft: rgba(123,228,149,0.2);
+    --pw-color: #f4fff6; --pw-stroke: #103020;
+    --pb-color: #0c2518; --pb-stroke: rgba(210,255,220,0.6);
+}
+
+/* 9 · Frosted Slate (muted silver) */
+.theme-9 {
+    --light-square: #f6f7fb; --dark-square: #bfc2d7;
+    --accent-strong: #9aa4ff; --accent-soft: rgba(154,164,255,0.2);
+    --pw-color: #f8f9ff; --pw-stroke: #20223a;
+    --pb-color: #181a30; --pb-stroke: rgba(220,225,255,0.6);
+}

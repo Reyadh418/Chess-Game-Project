@@ -1,24 +1,21 @@
 import { ChessEngine } from './chessEngine.js';
 import { AiPlayer } from './ai.js';
 
-const boardEl = document.getElementById('board');
-const statusText = document.getElementById('statusText');
-const turnText = document.getElementById('turnText');
-const unlockText = document.getElementById('unlockText');
-const moveListEl = document.getElementById('moveList');
-const modeAIButton = document.getElementById('modeAI');
-const modePvpButton = document.getElementById('modePvp');
-const aiControls = document.getElementById('aiControls');
-const timeButtons = document.querySelectorAll('#timeControls .chip');
-const newGameBtn = document.getElementById('newGameBtn');
-const resetProgressBtn = document.getElementById('resetProgressBtn');
-const undoBtn = document.getElementById('undoBtn');
-const themeGrid = document.getElementById('themeGrid');
-const themeTemplate = document.getElementById('themeCardTemplate');
-const clockEls = {
-    w: document.getElementById('timeWhite'),
-    b: document.getElementById('timeBlack'),
-};
+let boardEl;
+let statusText;
+let turnText;
+let unlockText;
+let moveListEl;
+let modeAIButton;
+let modePvpButton;
+let aiControls;
+let timeButtons;
+let newGameBtn;
+let resetProgressBtn;
+let undoBtn;
+let themeGrid;
+let themeTemplate;
+let clockEls;
 
 let engine = new ChessEngine();
 let ai = new AiPlayer('easy');
@@ -27,7 +24,24 @@ let selectedSquare = null;
 let legalMovesCache = [];
 let lastMoveSquares = [];
 let activeTheme = 0;
-let unlockCount = loadUnlocks();
+const storage = {
+    get(key) {
+        try {
+            return localStorage.getItem(key);
+        } catch (_) {
+            return null;
+        }
+    },
+    set(key, value) {
+        try {
+            localStorage.setItem(key, value);
+        } catch (_) {
+            // storage blocked (private mode); ignore silently
+        }
+    },
+};
+
+let unlockCount = 1;
 let timeControl = 'untimed';
 let timers = { w: null, b: null };
 let timerInterval = null;
@@ -53,6 +67,27 @@ const pieceIcons = {
 };
 
 function init() {
+    boardEl = document.getElementById('board');
+    statusText = document.getElementById('statusText');
+    turnText = document.getElementById('turnText');
+    unlockText = document.getElementById('unlockText');
+    moveListEl = document.getElementById('moveList');
+    modeAIButton = document.getElementById('modeAI');
+    modePvpButton = document.getElementById('modePvp');
+    aiControls = document.getElementById('aiControls');
+    timeButtons = document.querySelectorAll('#timeControls .chip');
+    newGameBtn = document.getElementById('newGameBtn');
+    resetProgressBtn = document.getElementById('resetProgressBtn');
+    undoBtn = document.getElementById('undoBtn');
+    themeGrid = document.getElementById('themeGrid');
+    themeTemplate = document.getElementById('themeCardTemplate');
+    clockEls = {
+        w: document.getElementById('timeWhite'),
+        b: document.getElementById('timeBlack'),
+    };
+
+    unlockCount = loadUnlocks();
+
     buildBoard();
     bindControls();
     renderThemes();
@@ -62,6 +97,7 @@ function init() {
 }
 
 function buildBoard() {
+    if (!boardEl) return;
     boardEl.innerHTML = '';
     for (let row = 0; row < 8; row++) {
         for (let col = 0; col < 8; col++) {
@@ -90,6 +126,7 @@ function bindControls() {
             timeButtons.forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             timeControl = btn.dataset.time;
+            resetTimers();
         });
     });
 
@@ -113,13 +150,22 @@ function bindControls() {
 }
 
 function setMode(nextMode) {
+    if (mode === nextMode) return;
     mode = nextMode;
     modeAIButton.classList.toggle('active', nextMode === 'ai');
     modePvpButton.classList.toggle('active', nextMode === 'pvp');
     aiControls.style.display = nextMode === 'ai' ? 'block' : 'none';
+    startNewGame();
 }
 
 function renderThemes() {
+    if (!themeTemplate || !themeGrid) {
+        console.warn('Theme template missing in DOM');
+        return;
+    }
+    if (activeTheme + 1 > unlockCount) {
+        activeTheme = 0;
+    }
     themeGrid.innerHTML = '';
     themes.forEach(theme => {
         const card = themeTemplate.content.firstElementChild.cloneNode(true);
@@ -144,7 +190,10 @@ function renderThemes() {
 function selectTheme(id) {
     activeTheme = id;
     document.querySelectorAll('.theme-card').forEach(c => c.classList.toggle('active', Number(c.dataset.theme) === id));
-    document.querySelector('.board-shell').className = `board-shell theme-${id}`;
+    const shell = document.querySelector('.board-shell');
+    if (shell) {
+        shell.className = `board-shell theme-${id}`;
+    }
 }
 
 function startNewGame() {
@@ -163,6 +212,7 @@ function startNewGame() {
 }
 
 function refreshBoard() {
+    if (!boardEl) return;
     const snapshot = engine.getBoardSnapshot();
     const legalMoves = engine.generateLegalMoves(engine.turn);
     legalMovesCache = legalMoves;
@@ -176,7 +226,7 @@ function refreshBoard() {
         if (piece) {
             const icon = pieceIcons[`${piece.color}${piece.type}`];
             const span = document.createElement('span');
-            span.className = 'piece';
+            span.className = `piece piece-${piece.color}`;
             span.textContent = icon;
             square.appendChild(span);
         }
@@ -241,6 +291,7 @@ function showHighlights(square) {
 }
 
 function clearHighlights() {
+    if (!boardEl) return;
     boardEl.querySelectorAll('.square').forEach(sq => sq.classList.remove('selected', 'highlight-move', 'capture'));
 }
 
@@ -275,15 +326,21 @@ function applyMoveAndUpdate(move, actor) {
 function updateStatus(manualText) {
     const state = engine.getGameState();
     const turnLabel = engine.turn === 'w' ? 'White' : 'Black';
-    turnText.textContent = turnLabel;
+    if (turnText) {
+        turnText.textContent = turnLabel;
+    }
 
     if (manualText) {
-        statusText.textContent = manualText;
+        if (statusText) {
+            statusText.textContent = manualText;
+        }
         return;
     }
 
     if (state.status === 'checkmate') {
-        statusText.textContent = `${state.winner === 'w' ? 'White' : 'Black'} wins by checkmate`;
+        if (statusText) {
+            statusText.textContent = `${state.winner === 'w' ? 'White' : 'Black'} wins by checkmate`;
+        }
         gameOver = true;
         stopTimer();
         if (mode === 'ai' && state.winner === 'w') {
@@ -296,20 +353,27 @@ function updateStatus(manualText) {
     }
 
     if (state.status === 'stalemate') {
-        statusText.textContent = 'Draw by stalemate';
+        if (statusText) {
+            statusText.textContent = 'Draw by stalemate';
+        }
         gameOver = true;
         stopTimer();
         return;
     }
 
     if (state.inCheck) {
-        statusText.textContent = `${turnLabel} is in check`;
+        if (statusText) {
+            statusText.textContent = `${turnLabel} is in check`;
+        }
     } else {
-        statusText.textContent = 'Game in progress';
+        if (statusText) {
+            statusText.textContent = 'Game in progress';
+        }
     }
 }
 
 function pushMoveToList(move, actor) {
+    if (!moveListEl) return;
     const li = document.createElement('li');
     const from = engine.coordsToSquare(move.from.row, move.from.col);
     const to = engine.coordsToSquare(move.to.row, move.to.col);
@@ -324,17 +388,19 @@ function pushMoveToList(move, actor) {
 }
 
 function refreshUnlockDisplay() {
-    unlockText.textContent = `${unlockCount} / 10`;
+    if (unlockText) {
+        unlockText.textContent = `${unlockCount} / 10`;
+    }
 }
 
 function saveUnlocks() {
-    localStorage.setItem('aurumUnlocks', String(unlockCount));
+    storage.set('aurumUnlocks', String(unlockCount));
 }
 
 function loadUnlocks() {
-    const stored = localStorage.getItem('aurumUnlocks');
+    const stored = storage.get('aurumUnlocks');
     const parsed = stored ? parseInt(stored, 10) : 1;
-    return Math.min(Math.max(parsed || 1, 1), 10);
+    return Math.min(Math.max(Number.isFinite(parsed) ? parsed : 1, 1), 10);
 }
 
 function resetTimers() {
@@ -375,7 +441,9 @@ function handleFlagFall(color) {
     gameOver = true;
     stopTimer();
     const winner = color === 'w' ? 'Black' : 'White';
-    statusText.textContent = `${winner} wins on time`;
+    if (statusText) {
+        statusText.textContent = `${winner} wins on time`;
+    }
 }
 
 function stopTimer() {
@@ -402,4 +470,14 @@ function formatTime(seconds) {
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
-init();
+window.addEventListener('DOMContentLoaded', () => {
+    try {
+        init();
+    } catch (err) {
+        console.error('Failed to initialize Aurum Chess', err);
+        const fallback = document.getElementById('statusText');
+        if (fallback) {
+            fallback.textContent = 'Failed to load. Please refresh.';
+        }
+    }
+});
