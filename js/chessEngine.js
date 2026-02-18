@@ -85,6 +85,7 @@ class ChessEngine {
 
     generatePseudoMoves(row, col, piece) {
         const moves = [];
+        const isEnemyKing = target => target && target.type === 'k' && target.color !== piece.color;
         const directions = {
             n: [
                 [-2, -1], [-2, 1], [-1, -2], [-1, 2],
@@ -115,7 +116,7 @@ class ChessEngine {
                 const targetRow = row + dir;
                 if (!this.inBounds(targetRow, c)) continue;
                 const targetPiece = this.getPiece(targetRow, c);
-                if (targetPiece && targetPiece.color !== piece.color) {
+                if (targetPiece && targetPiece.color !== piece.color && !isEnemyKing(targetPiece)) {
                     moves.push({ from: { row, col }, to: { row: targetRow, col: c } });
                 }
                 // en passant capture
@@ -131,7 +132,7 @@ class ChessEngine {
                 const c = col + dc;
                 if (!this.inBounds(r, c)) continue;
                 const target = this.getPiece(r, c);
-                if (!target || target.color !== piece.color) {
+                if (!target || (target.color !== piece.color && !isEnemyKing(target))) {
                     moves.push({ from: { row, col }, to: { row: r, col: c } });
                 }
             }
@@ -145,7 +146,7 @@ class ChessEngine {
                     if (!target) {
                         moves.push({ from: { row, col }, to: { row: r, col: c } });
                     } else {
-                        if (target.color !== piece.color) {
+                        if (target.color !== piece.color && !isEnemyKing(target)) {
                             moves.push({ from: { row, col }, to: { row: r, col: c } });
                         }
                         break;
@@ -160,7 +161,7 @@ class ChessEngine {
                 const c = col + dc;
                 if (!this.inBounds(r, c)) continue;
                 const target = this.getPiece(r, c);
-                if (!target || target.color !== piece.color) {
+                if (!target || (target.color !== piece.color && !isEnemyKing(target))) {
                     moves.push({ from: { row, col }, to: { row: r, col: c } });
                 }
             }
@@ -328,7 +329,7 @@ class ChessEngine {
 
     isInCheck(color) {
         const kingPos = this.findKing(color);
-        if (!kingPos) return false;
+        if (!kingPos) return true; // Treat missing king as already captured/in check
         return this.isSquareAttacked(kingPos.row, kingPos.col, this.opponent(color));
     }
 
@@ -348,7 +349,7 @@ class ChessEngine {
         // pawn attacks
         const pawnDir = byColor === 'w' ? -1 : 1;
         for (const dc of [-1, 1]) {
-            const r = row + pawnDir;
+            const r = row - pawnDir; // Pawns attack forward relative to their color
             const c = col + dc;
             if (this.inBounds(r, c)) {
                 const p = this.getPiece(r, c);
