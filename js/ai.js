@@ -1,3 +1,5 @@
+import { ChessEngine } from './chessEngine.js';
+
 class AiPlayer {
     constructor(difficulty = 'easy') {
         this.difficulty = difficulty;
@@ -109,3 +111,5 @@ class AiPlayer {
         return danger ? -50 : 10;
     }
 }
+
+export { AiPlayer };

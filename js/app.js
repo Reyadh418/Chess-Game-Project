@@ -1,3 +1,6 @@
+import { ChessEngine } from './chessEngine.js';
+import { AiPlayer } from './ai.js';
+
 let boardEl;
 let statusText;
 let turnText;
@@ -13,21 +16,24 @@ let undoBtn;
 let themeGrid;
 let themeTemplate;
 let clockEls;
-// Focus-mode DOM refs
-let focusBtn;
-let focusOverlay;
+
+// Captured pieces
+let capturedWhiteEl;
+let capturedBlackEl;
+let capturedPieces = { w: [], b: [] }; // w = captured BY white, b = captured BY black
+
+// Focus mode
+let focusLayout;
+let focusBoard;
 let focusBoardShell;
-let focusTimeW;
-let focusTimeB;
-let focusClockW;
-let focusClockB;
+let focusMoveList;
 let focusStatusText;
 let focusTurnText;
-let focusMoveList;
-let fcWhitePieces;
-let fcBlackPieces;
-let focusExitBtn;
-let focusMode = false;
+let focusTimeWhite;
+let focusTimeBlack;
+let focusCapturedWhite;
+let focusCapturedBlack;
+let isFocusMode = false;
 
 let engine = new ChessEngine();
 let ai = new AiPlayer('easy');
@@ -59,8 +65,6 @@ let timers = { w: null, b: null };
 let timerInterval = null;
 let lastTick = null;
 let gameOver = false;
-let capturedByWhite = [];
-let capturedByBlack = [];
 
 const themes = [
     { id: 0, name: 'Polished Quartz', light: '#f7f8fc', dark: '#cad1e5' },
@@ -100,58 +104,31 @@ function init() {
         b: document.getElementById('timeBlack'),
     };
 
-    focusBtn        = document.getElementById('focusBtn');
-    focusOverlay    = document.getElementById('focusOverlay');
+    // Captured pieces elements
+    capturedWhiteEl = document.getElementById('capturedWhite');
+    capturedBlackEl = document.getElementById('capturedBlack');
+
+    // Focus mode elements
+    focusLayout = document.getElementById('focusLayout');
+    focusBoard = document.getElementById('focusBoard');
     focusBoardShell = document.getElementById('focusBoardShell');
-    focusTimeW      = document.getElementById('focusTimeWhite');
-    focusTimeB      = document.getElementById('focusTimeBlack');
-    focusClockW     = document.getElementById('focusClockWhite');
-    focusClockB     = document.getElementById('focusClockBlack');
+    focusMoveList = document.getElementById('focusMoveList');
     focusStatusText = document.getElementById('focusStatusText');
-    focusTurnText   = document.getElementById('focusTurnText');
-    focusMoveList   = document.getElementById('focusMoveList');
-    fcWhitePieces   = document.getElementById('fcWhitePieces');
-    fcBlackPieces   = document.getElementById('fcBlackPieces');
-    focusExitBtn    = document.getElementById('focusExitBtn');
+    focusTurnText = document.getElementById('focusTurnText');
+    focusTimeWhite = document.getElementById('focusTimeWhite');
+    focusTimeBlack = document.getElementById('focusTimeBlack');
+    focusCapturedWhite = document.getElementById('focusCapturedWhite');
+    focusCapturedBlack = document.getElementById('focusCapturedBlack');
 
-    if (focusBtn)     focusBtn.addEventListener('click', toggleFocus);
-    if (focusExitBtn) focusExitBtn.addEventListener('click', () => { focusMode = true; toggleFocus(); });
-
+    unlockCount = loadUnlocks();
 
     buildBoard();
+    buildFocusBoard();
     bindControls();
     renderThemes();
     selectTheme(activeTheme);
     refreshUnlockDisplay();
     startNewGame();
-}
-
-function toggleFocus() {
-    focusMode = !focusMode;
-    document.body.classList.toggle('focus-active', focusMode);
-    if (focusOverlay) focusOverlay.setAttribute('aria-hidden', String(!focusMode));
-
-    if (focusMode) {
-        // Move real board into focus shell
-        const realShell = document.querySelector('.board-shell');
-        if (realShell && focusBoardShell) {
-            focusBoardShell.innerHTML = '';
-            focusBoardShell.appendChild(realShell);
-        }
-        syncFocusSidebar();
-    } else {
-        // Return board to normal layout
-        const boardWrap = document.querySelector('.board-wrapper');
-        const realShell = focusBoardShell ? focusBoardShell.querySelector('.board-shell') : null;
-        if (realShell && boardWrap) {
-            const overlay = boardWrap.querySelector('#boardOverlay');
-            if (overlay) {
-                boardWrap.insertBefore(realShell, overlay.parentNode.contains(overlay) ? overlay.nextSibling : null);
-            } else {
-                boardWrap.insertBefore(realShell, boardWrap.querySelector('.info-row'));
-            }
-        }
-    }
 }
 
 function buildBoard() {
@@ -164,6 +141,20 @@ function buildBoard() {
             square.dataset.square = engine.coordsToSquare(row, col);
             square.addEventListener('click', () => onSquareClick(square.dataset.square));
             boardEl.appendChild(square);
+        }
+    }
+}
+
+function buildFocusBoard() {
+    if (!focusBoard) return;
+    focusBoard.innerHTML = '';
+    for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 8; col++) {
+            const square = document.createElement('button');
+            square.className = `square ${(row + col) % 2 === 0 ? 'light' : 'dark'}`;
+            square.dataset.square = engine.coordsToSquare(row, col);
+            square.addEventListener('click', () => onSquareClick(square.dataset.square));
+            focusBoard.appendChild(square);
         }
     }
 }
@@ -189,6 +180,18 @@ function bindControls() {
     });
 
     newGameBtn.addEventListener('click', startNewGame);
+    document.getElementById('focusModeBtn').addEventListener('click', () => toggleFocusMode(true));
+    document.getElementById('exitFocusBtn').addEventListener('click', () => toggleFocusMode(false));
+    document.getElementById('focusUndoBtn').addEventListener('click', () => {
+        if (engine.history.length === 0 || gameOver) return;
+        engine.undo();
+        if (mode === 'ai' && engine.turn === 'b' && engine.history.length) {
+            engine.undo();
+        }
+        rebuildCapturedFromHistory();
+        refreshBoard();
+        updateStatus();
+    });
     resetProgressBtn.addEventListener('click', () => {
         unlockCount = 1;
         saveUnlocks();
@@ -202,6 +205,7 @@ function bindControls() {
         if (mode === 'ai' && engine.turn === 'b' && engine.history.length) {
             engine.undo();
         }
+        rebuildCapturedFromHistory();
         refreshBoard();
         updateStatus();
     });
@@ -248,11 +252,10 @@ function renderThemes() {
 function selectTheme(id) {
     activeTheme = id;
     document.querySelectorAll('.theme-card').forEach(c => c.classList.toggle('active', Number(c.dataset.theme) === id));
-    // Apply theme class to whichever shell is currently active
-    const shell = document.querySelector('.board-shell');
-    if (shell) {
-        shell.className = `board-shell theme-${id}`;
-    }
+    const themeClass = `board-shell theme-${id}`;
+    const shell = document.querySelector('.board-wrapper .board-shell');
+    if (shell) shell.className = themeClass;
+    if (focusBoardShell) focusBoardShell.className = themeClass;
 }
 
 function startNewGame() {
@@ -261,10 +264,10 @@ function startNewGame() {
     selectedSquare = null;
     legalMovesCache = [];
     gameOver = false;
-    capturedByWhite = [];
-    capturedByBlack = [];
-    moveListEl.innerHTML = '';
+    capturedPieces = { w: [], b: [] };
+    if (moveListEl) moveListEl.innerHTML = '';
     if (focusMoveList) focusMoveList.innerHTML = '';
+    renderCaptured();
     resetTimers();
     refreshBoard();
     updateStatus('New game ready');
@@ -274,36 +277,42 @@ function startNewGame() {
 }
 
 function refreshBoard() {
-    if (!boardEl) return;
     const snapshot = engine.getBoardSnapshot();
     const legalMoves = engine.generateLegalMoves(engine.turn);
     legalMovesCache = legalMoves;
-    boardEl.querySelectorAll('.square').forEach(square => {
-        const algebraic = square.dataset.square;
-        const { row, col } = engine.squareToCoords(algebraic);
-        const piece = snapshot[row][col];
-        square.innerHTML = '';
-        square.classList.remove('selected', 'highlight-move', 'capture', 'last-move', 'in-check');
 
-        if (piece) {
-            const icon = pieceIcons[`${piece.color}${piece.type}`];
-            const span = document.createElement('span');
-            span.className = `piece piece-${piece.color}`;
-            span.textContent = icon;
-            square.appendChild(span);
-        }
+    // render both boards (normal + focus)
+    const boards = [boardEl, focusBoard].filter(Boolean);
+    boards.forEach(bEl => {
+        bEl.querySelectorAll('.square').forEach(square => {
+            const algebraic = square.dataset.square;
+            const { row, col } = engine.squareToCoords(algebraic);
+            const piece = snapshot[row][col];
+            square.innerHTML = '';
+            square.classList.remove('selected', 'highlight-move', 'capture', 'last-move', 'in-check');
 
-        if (lastMoveSquares.includes(algebraic)) {
-            square.classList.add('last-move');
+            if (piece) {
+                const icon = pieceIcons[`${piece.color}${piece.type}`];
+                const span = document.createElement('span');
+                span.className = `piece piece-${piece.color}`;
+                span.textContent = icon;
+                square.appendChild(span);
+            }
+
+            if (lastMoveSquares.includes(algebraic)) {
+                square.classList.add('last-move');
+            }
+        });
+
+        const kingPos = engine.findKing(engine.turn);
+        if (kingPos && engine.isInCheck(engine.turn)) {
+            const sq = engine.coordsToSquare(kingPos.row, kingPos.col);
+            const el = bEl.querySelector(`[data-square="${sq}"]`);
+            if (el) el.classList.add('in-check');
         }
     });
 
-    const kingPos = engine.findKing(engine.turn);
-    if (kingPos && engine.isInCheck(engine.turn)) {
-        const sq = engine.coordsToSquare(kingPos.row, kingPos.col);
-        const el = boardEl.querySelector(`[data-square="${sq}"]`);
-        if (el) el.classList.add('in-check');
-    }
+    renderCaptured();
 }
 
 function onSquareClick(square) {
@@ -338,23 +347,28 @@ function onSquareClick(square) {
 function showHighlights(square) {
     clearHighlights();
     const moves = legalMovesCache.filter(m => engine.coordsToSquare(m.from.row, m.from.col) === square);
-    const squareEl = boardEl.querySelector(`[data-square="${square}"]`);
-    if (squareEl) squareEl.classList.add('selected');
-    moves.forEach(m => {
-        const target = engine.coordsToSquare(m.to.row, m.to.col);
-        const targetEl = boardEl.querySelector(`[data-square="${target}"]`);
-        if (targetEl) {
-            targetEl.classList.add('highlight-move');
-            if (engine.getPiece(m.to.row, m.to.col)) {
-                targetEl.classList.add('capture');
+    const boards = [boardEl, focusBoard].filter(Boolean);
+    boards.forEach(bEl => {
+        const squareEl = bEl.querySelector(`[data-square="${square}"]`);
+        if (squareEl) squareEl.classList.add('selected');
+        moves.forEach(m => {
+            const target = engine.coordsToSquare(m.to.row, m.to.col);
+            const targetEl = bEl.querySelector(`[data-square="${target}"]`);
+            if (targetEl) {
+                targetEl.classList.add('highlight-move');
+                if (engine.getPiece(m.to.row, m.to.col)) {
+                    targetEl.classList.add('capture');
+                }
             }
-        }
+        });
     });
 }
 
 function clearHighlights() {
-    if (!boardEl) return;
-    boardEl.querySelectorAll('.square').forEach(sq => sq.classList.remove('selected', 'highlight-move', 'capture'));
+    const boards = [boardEl, focusBoard].filter(Boolean);
+    boards.forEach(bEl => {
+        bEl.querySelectorAll('.square').forEach(sq => sq.classList.remove('selected', 'highlight-move', 'capture'));
+    });
 }
 
 function makePlayerMove(move) {
@@ -377,77 +391,43 @@ function makeAIMove() {
 }
 
 function applyMoveAndUpdate(move, actor) {
-    // Track capture before applying
-    const targetPiece = engine.getPiece(move.to.row, move.to.col);
-    if (targetPiece) {
-        if (engine.turn === 'w') capturedByWhite.push(targetPiece.type);
-        else capturedByBlack.push(targetPiece.type);
-    }
+    // Track captured piece before applying
+    const capturedPiece = engine.getPiece(move.to.row, move.to.col);
+    let epCaptured = null;
     if (move.enPassantCapture) {
-        if (engine.turn === 'w') capturedByWhite.push('p');
-        else capturedByBlack.push('p');
+        const dir = engine.turn === 'w' ? 1 : -1;
+        epCaptured = engine.getPiece(move.to.row + dir, move.to.col);
     }
+    const taken = capturedPiece || epCaptured;
+
     engine.applyMove(move);
+
+    if (taken) {
+        // The piece was taken by the opponent of the taken piece
+        const capturedBy = taken.color === 'w' ? 'b' : 'w';
+        capturedPieces[capturedBy].push(taken);
+    }
+
     lastMoveSquares = [engine.coordsToSquare(move.from.row, move.from.col), engine.coordsToSquare(move.to.row, move.to.col)];
     pushMoveToList(move, actor);
     refreshBoard();
     updateStatus();
     switchTimer();
-    if (focusMode) syncFocusSidebar();
-}
-
-function syncFocusSidebar() {
-    if (!focusMode) return;
-
-    // Clocks
-    const wTime = timeControl === 'untimed' ? '--:--' : formatTime(timers.w);
-    const bTime = timeControl === 'untimed' ? '--:--' : formatTime(timers.b);
-    if (focusTimeW) focusTimeW.textContent = wTime;
-    if (focusTimeB) focusTimeB.textContent = bTime;
-
-    // Active clock highlight
-    if (focusClockW) focusClockW.classList.toggle('active', engine.turn === 'w' && !gameOver);
-    if (focusClockB) focusClockB.classList.toggle('active', engine.turn === 'b' && !gameOver);
-
-    // Status & turn
-    if (focusStatusText) focusStatusText.textContent = statusText ? statusText.textContent : '';
-    if (focusTurnText) focusTurnText.textContent = engine.turn === 'w' ? 'White' : 'Black';
-
-    // Mirror move list
-    if (focusMoveList && moveListEl) {
-        focusMoveList.innerHTML = moveListEl.innerHTML;
-        focusMoveList.scrollTop = focusMoveList.scrollHeight;
-    }
-
-    // Captured pieces
-    const pieceLabel = { p:'♟', n:'♞', b:'♝', r:'♜', q:'♛' };
-    const wPieceLabel = { p:'♙', n:'♘', b:'♗', r:'♖', q:'♕' };
-    if (fcWhitePieces) {
-        fcWhitePieces.textContent = capturedByWhite.map(t => wPieceLabel[t] || t).join(' ') || '—';
-    }
-    if (fcBlackPieces) {
-        fcBlackPieces.textContent = capturedByBlack.map(t => pieceLabel[t] || t).join(' ') || '—';
-    }
 }
 
 function updateStatus(manualText) {
     const state = engine.getGameState();
     const turnLabel = engine.turn === 'w' ? 'White' : 'Black';
-    if (turnText) {
-        turnText.textContent = turnLabel;
-    }
+    [turnText, focusTurnText].forEach(el => { if (el) el.textContent = turnLabel; });
 
     if (manualText) {
-        if (statusText) {
-            statusText.textContent = manualText;
-        }
+        [statusText, focusStatusText].forEach(el => { if (el) el.textContent = manualText; });
         return;
     }
 
     if (state.status === 'checkmate') {
-        if (statusText) {
-            statusText.textContent = `${state.winner === 'w' ? 'White' : 'Black'} wins by checkmate`;
-        }
+        const msg = `${state.winner === 'w' ? 'White' : 'Black'} wins by checkmate`;
+        [statusText, focusStatusText].forEach(el => { if (el) el.textContent = msg; });
         gameOver = true;
         stopTimer();
         if (mode === 'ai' && state.winner === 'w') {
@@ -460,28 +440,20 @@ function updateStatus(manualText) {
     }
 
     if (state.status === 'stalemate') {
-        if (statusText) {
-            statusText.textContent = 'Draw by stalemate';
-        }
+        [statusText, focusStatusText].forEach(el => { if (el) el.textContent = 'Draw by stalemate'; });
         gameOver = true;
         stopTimer();
         return;
     }
 
     if (state.inCheck) {
-        if (statusText) {
-            statusText.textContent = `${turnLabel} is in check`;
-        }
+        [statusText, focusStatusText].forEach(el => { if (el) el.textContent = `${turnLabel} is in check`; });
     } else {
-        if (statusText) {
-            statusText.textContent = 'Game in progress';
-        }
+        [statusText, focusStatusText].forEach(el => { if (el) el.textContent = 'Game in progress'; });
     }
-    if (focusMode) syncFocusSidebar();
 }
 
 function pushMoveToList(move, actor) {
-    if (!moveListEl) return;
     const li = document.createElement('li');
     const from = engine.coordsToSquare(move.from.row, move.from.col);
     const to = engine.coordsToSquare(move.to.row, move.to.col);
@@ -491,8 +463,13 @@ function pushMoveToList(move, actor) {
     if (move.promotion) notation += ' = Q';
     if (actor === 'ai') notation += ' (AI)';
     li.textContent = notation;
-    moveListEl.appendChild(li);
-    moveListEl.scrollTop = moveListEl.scrollHeight;
+
+    [moveListEl, focusMoveList].forEach(el => {
+        if (!el) return;
+        const clone = li.cloneNode(true);
+        el.appendChild(clone);
+        el.scrollTop = el.scrollHeight;
+    });
 }
 
 function refreshUnlockDisplay() {
@@ -549,9 +526,8 @@ function handleFlagFall(color) {
     gameOver = true;
     stopTimer();
     const winner = color === 'w' ? 'Black' : 'White';
-    if (statusText) {
-        statusText.textContent = `${winner} wins on time`;
-    }
+    const msg = `${winner} wins on time`;
+    [statusText, focusStatusText].forEach(el => { if (el) el.textContent = msg; });
 }
 
 function stopTimer() {
@@ -563,18 +539,14 @@ function stopTimer() {
 
 function updateClockDisplays() {
     if (timeControl === 'untimed') {
-        clockEls.w.textContent = '--:--';
-        clockEls.b.textContent = '--:--';
-        if (focusTimeW) focusTimeW.textContent = '--:--';
-        if (focusTimeB) focusTimeB.textContent = '--:--';
+        [clockEls.w, focusTimeWhite].forEach(el => { if (el) el.textContent = '--:--'; });
+        [clockEls.b, focusTimeBlack].forEach(el => { if (el) el.textContent = '--:--'; });
         return;
     }
-    clockEls.w.textContent = formatTime(timers.w);
-    clockEls.b.textContent = formatTime(timers.b);
-    if (focusTimeW) focusTimeW.textContent = formatTime(timers.w);
-    if (focusTimeB) focusTimeB.textContent = formatTime(timers.b);
-    if (focusClockW) focusClockW.classList.toggle('active', engine.turn === 'w' && !gameOver);
-    if (focusClockB) focusClockB.classList.toggle('active', engine.turn === 'b' && !gameOver);
+    const wt = formatTime(timers.w);
+    const bt = formatTime(timers.b);
+    [clockEls.w, focusTimeWhite].forEach(el => { if (el) el.textContent = wt; });
+    [clockEls.b, focusTimeBlack].forEach(el => { if (el) el.textContent = bt; });
 }
 
 function formatTime(seconds) {
@@ -582,6 +554,59 @@ function formatTime(seconds) {
     const mins = Math.floor(s / 60);
     const secs = s % 60;
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
+/* ── Captured pieces ── */
+
+const pieceOrder = { q: 0, r: 1, b: 2, n: 3, p: 4 };
+
+function renderCaptured() {
+    const sortFn = (a, b) => (pieceOrder[a.type] ?? 9) - (pieceOrder[b.type] ?? 9);
+
+    const renderInto = (el, list) => {
+        if (!el) return;
+        el.innerHTML = '';
+        [...list].sort(sortFn).forEach(p => {
+            const span = document.createElement('span');
+            span.className = `piece-${p.color}`;
+            span.textContent = pieceIcons[`${p.color}${p.type}`];
+            el.appendChild(span);
+        });
+    };
+
+    renderInto(capturedWhiteEl, capturedPieces.w);
+    renderInto(capturedBlackEl, capturedPieces.b);
+    renderInto(focusCapturedWhite, capturedPieces.w);
+    renderInto(focusCapturedBlack, capturedPieces.b);
+}
+
+function rebuildCapturedFromHistory() {
+    capturedPieces = { w: [], b: [] };
+    for (const record of engine.history) {
+        const taken = record.capturedPiece || record.enPassantCaptured;
+        if (taken) {
+            const capturedBy = taken.color === 'w' ? 'b' : 'w';
+            capturedPieces[capturedBy].push(taken);
+        }
+    }
+    renderCaptured();
+}
+
+/* ── Focus Mode ── */
+
+function toggleFocusMode(on) {
+    isFocusMode = on;
+    document.body.classList.toggle('focus-active', on);
+    if (focusLayout) focusLayout.classList.toggle('active', on);
+
+    if (on) {
+        // Sync focus board theme
+        if (focusBoardShell) {
+            focusBoardShell.className = `board-shell theme-${activeTheme}`;
+        }
+        refreshBoard();
+        updateClockDisplays();
+    }
 }
 
 window.addEventListener('DOMContentLoaded', () => {

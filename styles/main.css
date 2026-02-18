@@ -372,6 +372,28 @@ button.ghost {
     gap: 10px;
 }
 
+.captured-bar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.captured-side {
+    border: 1px solid var(--stroke);
+    border-radius: 12px;
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.captured-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    min-height: 28px;
+    font-size: 22px;
+    line-height: 1;
+}
+
 .status {
     border: 1px solid var(--stroke);
     border-radius: 12px;
@@ -434,201 +456,7 @@ button.ghost {
     }
 }
 
-/* ── Focus View ────────────────────────────────────────────────────────── */
-
-.focus-overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    z-index: 100;
-    background: var(--bg);
-    background-attachment: fixed;
-    padding: 18px;
-    gap: 18px;
-    align-items: stretch;
-}
-
-body.focus-active .focus-overlay {
-    display: grid;
-    grid-template-columns: 1fr 340px;
-    grid-template-rows: 1fr;
-}
-
-/* Left column: captured bar + board + captured bar */
-.focus-board-col {
-    display: grid;
-    grid-template-rows: auto 1fr auto;
-    gap: 10px;
-    min-width: 0;
-}
-
-.focus-board-shell {
-    position: relative;
-    min-width: 0;
-    min-height: 0;
-}
-
-/* The actual .board-shell inside focus gets square sizing via container */
-.focus-board-shell .board-shell {
-    width: 100%;
-    height: 100%;
-    max-height: calc(100vh - 120px);
-    aspect-ratio: 1;
-    border-radius: 16px;
-    overflow: hidden;
-    box-shadow: var(--shadow);
-    border: 1px solid var(--stroke);
-}
-
-.focus-board-shell .board {
-    width: 100%;
-    height: 100%;
-    aspect-ratio: 1;
-}
-
-/* Captured pieces bars */
-.focus-captured {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 12px;
-    border: 1px solid var(--stroke);
-    border-radius: 12px;
-    background: rgba(255,255,255,0.03);
-    flex-wrap: wrap;
-}
-
-.fc-label {
-    font-size: 12px;
-    color: var(--muted);
-    white-space: nowrap;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
-
-.fc-pieces {
-    font-size: 20px;
-    letter-spacing: 2px;
-    line-height: 1;
-}
-
-/* Right sidebar */
-.focus-sidebar {
-    display: grid;
-    grid-template-rows: auto auto 1fr auto;
-    gap: 14px;
-    padding: 14px;
-    border: 1px solid var(--stroke);
-    border-radius: 16px;
-    background: rgba(255,255,255,0.03);
-    backdrop-filter: blur(10px);
-    overflow: hidden;
-}
-
-.focus-clocks {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-}
-
-.focus-clock {
-    border: 1px solid var(--stroke);
-    border-radius: 12px;
-    padding: 12px 14px;
-    background: rgba(255,255,255,0.03);
-    text-align: center;
-    transition: border-color 0.25s ease, box-shadow 0.25s ease;
-}
-
-.focus-clock.active {
-    border-color: var(--accent);
-    box-shadow: 0 0 20px rgba(126,243,198,0.25);
-}
-
-.focus-clock .fc-name {
-    display: block;
-    font-size: 12px;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    margin-bottom: 6px;
-}
-
-.focus-clock .fc-time {
-    display: block;
-    font-family: 'Space Grotesk', monospace;
-    font-size: 28px;
-    font-weight: 700;
-    letter-spacing: 2px;
-}
-
-.focus-status-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-}
-
-.focus-stat {
-    border: 1px solid var(--stroke);
-    border-radius: 12px;
-    padding: 10px 12px;
-    background: rgba(255,255,255,0.03);
-}
-
-.focus-stat .label {
-    margin: 0 0 4px;
-    font-size: 12px;
-    color: var(--muted);
-}
-
-.focus-stat .value {
-    margin: 0;
-    font-size: 15px;
-    font-weight: 700;
-}
-
-.focus-moves-wrap {
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.focus-move-list {
-    flex: 1;
-    overflow-y: auto;
-    max-height: none;
-    height: 100%;
-}
-
-.focus-exit {
-    width: 100%;
-    justify-content: center;
-    text-align: center;
-    border-color: var(--danger);
-    color: var(--danger);
-}
-
-.focus-exit:hover {
-    background: rgba(255,143,163,0.08);
-}
-
-@media (max-width: 800px) {
-    body.focus-active .focus-overlay {
-        grid-template-columns: 1fr;
-        grid-template-rows: 1fr auto;
-        overflow-y: auto;
-    }
-    .focus-board-shell .board-shell {
-        max-height: 60vw;
-    }
-    .focus-sidebar {
-        grid-template-rows: auto auto auto auto;
-    }
-}
-
-/* ── end Focus View ───────────────────────────────────────────────────
+/* ── Board theme swatches ───────────────────────────────────────────────
    Each theme sets square colours, accent colours, and overrides
    piece fill / stroke so pieces are always readable on that palette.
 ──────────────────────────────────────────────────────────────────────── */
@@ -711,4 +539,161 @@ body.focus-active .focus-overlay {
     --accent-strong: #9aa4ff; --accent-soft: rgba(154,164,255,0.2);
     --pw-color: #f8f9ff; --pw-stroke: #20223a;
     --pb-color: #181a30; --pb-stroke: rgba(220,225,255,0.6);
+}
+
+/* ═══════════════════════════════════════════
+   FOCUS MODE LAYOUT
+   ═══════════════════════════════════════════ */
+
+.focus-layout {
+    display: none;
+}
+
+.focus-layout.active {
+    display: flex;
+    flex-direction: row;
+    height: 100vh;
+    width: 100vw;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 1000;
+    background: var(--bg);
+    background-attachment: fixed;
+    overflow: hidden;
+}
+
+/* Left — board fills entire area as a square */
+.focus-board-area {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+    min-width: 0;
+}
+
+.focus-board-area .board-shell {
+    width: calc(100vh - 24px);
+    max-width: 100%;
+    height: calc(100vh - 24px);
+    max-height: 100%;
+}
+
+.focus-board-area .board {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    grid-template-rows: repeat(8, 1fr);
+}
+
+/* Center — clocks + captured */
+.focus-center {
+    width: 200px;
+    min-width: 200px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 16px 12px;
+    justify-content: center;
+    border-left: 1px solid var(--stroke);
+    border-right: 1px solid var(--stroke);
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.focus-clock {
+    border: 1px solid var(--stroke);
+    border-radius: 12px;
+    padding: 14px 16px;
+    background: rgba(255, 255, 255, 0.03);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.focus-clock .tag {
+    color: var(--muted);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.focus-clock .time {
+    font-weight: 700;
+    font-size: 28px;
+}
+
+.focus-captured {
+    border: 1px solid var(--stroke);
+    border-radius: 12px;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.focus-captured .captured-row {
+    min-height: 32px;
+    font-size: 24px;
+}
+
+.focus-vs {
+    text-align: center;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--muted);
+    letter-spacing: 4px;
+}
+
+/* Right — info + moves + exit */
+.focus-right {
+    width: 280px;
+    min-width: 280px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow: hidden;
+}
+
+.focus-info {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.focus-right .move-list {
+    flex: 1;
+    max-height: none;
+    overflow-y: auto;
+}
+
+.exit-focus-btn {
+    margin-top: auto;
+    width: 100%;
+    padding: 14px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--danger);
+    border-color: rgba(255,143,163,0.25);
+}
+
+.exit-focus-btn:hover {
+    background: rgba(255,143,163,0.08);
+}
+
+/* Hide normal layout when focus is active */
+body.focus-active .hero-grid > header,
+body.focus-active #normalLayout {
+    display: none !important;
+}
+
+body.focus-active {
+    padding: 0;
+    overflow: hidden;
+}
+
+body.focus-active .hero-grid {
+    max-width: 100%;
+    gap: 0;
+    height: 100vh;
 }
