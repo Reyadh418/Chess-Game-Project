@@ -29,6 +29,7 @@ body {
     background: var(--bg);
     background-attachment: fixed;
     padding: 24px;
+    overflow-x: hidden;
 }
 
 .hero-grid {
@@ -499,10 +500,6 @@ button.ghost {
         grid-template-columns: 1fr;
     }
 
-    .board {
-        max-width: 100%;
-    }
-
     .info-row {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
@@ -544,6 +541,8 @@ button.ghost {
     .board-shell {
         max-width: 640px;
         margin: 0 auto;
+        width: 100%;
+        height: auto;
     }
 
     .timers {
@@ -573,7 +572,11 @@ button.ghost {
     }
 
     .board-shell {
+        width: calc(100vw - 20px);
+        height: calc(100vw - 20px);
         max-width: 100%;
+        max-height: 100vw;
+        margin: 0 auto;
     }
 
     .moves .move-list {
@@ -837,9 +840,10 @@ body.focus-active .hero-grid {
     }
 
     .focus-board-area .board-shell {
-        width: 100%;
-        height: 100%;
+        width: calc(100vw - 20px);
+        height: calc(100vw - 20px);
         max-width: 100%;
+        max-height: calc(100vw - 20px);
     }
 
     .focus-center {
