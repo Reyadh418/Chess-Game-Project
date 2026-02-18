@@ -17,6 +17,7 @@
 				<h1>Aurum Chess</h1>
 			</div>
 			<div class="top-actions">
+				<button id="focusBtn" class="ghost" title="Toggle board focus view">⛶ Focus View</button>
 				<button id="newGameBtn" class="primary">Start Game</button>
 				<button id="resetProgressBtn" class="ghost" title="Reset unlocks">Reset Unlocks</button>
 			</div>
@@ -111,6 +112,52 @@
 		</button>
 	</template>
 
-	<script type="module" src="js/app.js"></script>
+	<!-- Focus-mode overlay -->
+	<div class="focus-overlay" id="focusOverlay" aria-hidden="true">
+		<div class="focus-board-col">
+			<div class="focus-captured" id="focusCapturedBlack">
+				<span class="fc-label">Black took</span>
+				<span class="fc-pieces" id="fcBlackPieces"></span>
+			</div>
+			<div class="focus-board-shell" id="focusBoardShell"></div>
+			<div class="focus-captured" id="focusCapturedWhite">
+				<span class="fc-label">White took</span>
+				<span class="fc-pieces" id="fcWhitePieces"></span>
+			</div>
+		</div>
+		<aside class="focus-sidebar">
+			<div class="focus-clocks">
+				<div class="focus-clock" id="focusClockBlack">
+					<span class="fc-name">Black</span>
+					<span class="fc-time" id="focusTimeBlack">--:--</span>
+				</div>
+				<div class="focus-clock" id="focusClockWhite">
+					<span class="fc-name">White</span>
+					<span class="fc-time" id="focusTimeWhite">--:--</span>
+				</div>
+			</div>
+			<div class="focus-status-row">
+				<div class="focus-stat">
+					<p class="label">Status</p>
+					<p class="value" id="focusStatusText">Ready</p>
+				</div>
+				<div class="focus-stat">
+					<p class="label">Turn</p>
+					<p class="value" id="focusTurnText">White</p>
+				</div>
+			</div>
+			<div class="focus-moves-wrap">
+				<div class="label-row">
+					<p class="label">Move List</p>
+				</div>
+				<ol id="focusMoveList" class="move-list focus-move-list"></ol>
+			</div>
+			<button class="ghost focus-exit" id="focusExitBtn">✕ Exit Focus</button>
+		</aside>
+	</div>
+
+	<script src="js/chessEngine.js"></script>
+	<script src="js/ai.js"></script>
+	<script src="js/app.js"></script>
 </body>
 </html>

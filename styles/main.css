@@ -434,7 +434,201 @@ button.ghost {
     }
 }
 
-/* ── Board theme swatches ───────────────────────────────────────────────
+/* ── Focus View ────────────────────────────────────────────────────────── */
+
+.focus-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: var(--bg);
+    background-attachment: fixed;
+    padding: 18px;
+    gap: 18px;
+    align-items: stretch;
+}
+
+body.focus-active .focus-overlay {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    grid-template-rows: 1fr;
+}
+
+/* Left column: captured bar + board + captured bar */
+.focus-board-col {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    gap: 10px;
+    min-width: 0;
+}
+
+.focus-board-shell {
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+}
+
+/* The actual .board-shell inside focus gets square sizing via container */
+.focus-board-shell .board-shell {
+    width: 100%;
+    height: 100%;
+    max-height: calc(100vh - 120px);
+    aspect-ratio: 1;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--stroke);
+}
+
+.focus-board-shell .board {
+    width: 100%;
+    height: 100%;
+    aspect-ratio: 1;
+}
+
+/* Captured pieces bars */
+.focus-captured {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border: 1px solid var(--stroke);
+    border-radius: 12px;
+    background: rgba(255,255,255,0.03);
+    flex-wrap: wrap;
+}
+
+.fc-label {
+    font-size: 12px;
+    color: var(--muted);
+    white-space: nowrap;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.fc-pieces {
+    font-size: 20px;
+    letter-spacing: 2px;
+    line-height: 1;
+}
+
+/* Right sidebar */
+.focus-sidebar {
+    display: grid;
+    grid-template-rows: auto auto 1fr auto;
+    gap: 14px;
+    padding: 14px;
+    border: 1px solid var(--stroke);
+    border-radius: 16px;
+    background: rgba(255,255,255,0.03);
+    backdrop-filter: blur(10px);
+    overflow: hidden;
+}
+
+.focus-clocks {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.focus-clock {
+    border: 1px solid var(--stroke);
+    border-radius: 12px;
+    padding: 12px 14px;
+    background: rgba(255,255,255,0.03);
+    text-align: center;
+    transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.focus-clock.active {
+    border-color: var(--accent);
+    box-shadow: 0 0 20px rgba(126,243,198,0.25);
+}
+
+.focus-clock .fc-name {
+    display: block;
+    font-size: 12px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 6px;
+}
+
+.focus-clock .fc-time {
+    display: block;
+    font-family: 'Space Grotesk', monospace;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: 2px;
+}
+
+.focus-status-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.focus-stat {
+    border: 1px solid var(--stroke);
+    border-radius: 12px;
+    padding: 10px 12px;
+    background: rgba(255,255,255,0.03);
+}
+
+.focus-stat .label {
+    margin: 0 0 4px;
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.focus-stat .value {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.focus-moves-wrap {
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.focus-move-list {
+    flex: 1;
+    overflow-y: auto;
+    max-height: none;
+    height: 100%;
+}
+
+.focus-exit {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+.focus-exit:hover {
+    background: rgba(255,143,163,0.08);
+}
+
+@media (max-width: 800px) {
+    body.focus-active .focus-overlay {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr auto;
+        overflow-y: auto;
+    }
+    .focus-board-shell .board-shell {
+        max-height: 60vw;
+    }
+    .focus-sidebar {
+        grid-template-rows: auto auto auto auto;
+    }
+}
+
+/* ── end Focus View ───────────────────────────────────────────────────
    Each theme sets square colours, accent colours, and overrides
    piece fill / stroke so pieces are always readable on that palette.
 ──────────────────────────────────────────────────────────────────────── */

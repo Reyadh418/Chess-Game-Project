@@ -1,6 +1,3 @@
-import { ChessEngine } from './chessEngine.js';
-import { AiPlayer } from './ai.js';
-
 let boardEl;
 let statusText;
 let turnText;
@@ -16,6 +13,21 @@ let undoBtn;
 let themeGrid;
 let themeTemplate;
 let clockEls;
+// Focus-mode DOM refs
+let focusBtn;
+let focusOverlay;
+let focusBoardShell;
+let focusTimeW;
+let focusTimeB;
+let focusClockW;
+let focusClockB;
+let focusStatusText;
+let focusTurnText;
+let focusMoveList;
+let fcWhitePieces;
+let fcBlackPieces;
+let focusExitBtn;
+let focusMode = false;
 
 let engine = new ChessEngine();
 let ai = new AiPlayer('easy');
@@ -47,6 +59,8 @@ let timers = { w: null, b: null };
 let timerInterval = null;
 let lastTick = null;
 let gameOver = false;
+let capturedByWhite = [];
+let capturedByBlack = [];
 
 const themes = [
     { id: 0, name: 'Polished Quartz', light: '#f7f8fc', dark: '#cad1e5' },
@@ -86,7 +100,23 @@ function init() {
         b: document.getElementById('timeBlack'),
     };
 
-    unlockCount = loadUnlocks();
+    focusBtn        = document.getElementById('focusBtn');
+    focusOverlay    = document.getElementById('focusOverlay');
+    focusBoardShell = document.getElementById('focusBoardShell');
+    focusTimeW      = document.getElementById('focusTimeWhite');
+    focusTimeB      = document.getElementById('focusTimeBlack');
+    focusClockW     = document.getElementById('focusClockWhite');
+    focusClockB     = document.getElementById('focusClockBlack');
+    focusStatusText = document.getElementById('focusStatusText');
+    focusTurnText   = document.getElementById('focusTurnText');
+    focusMoveList   = document.getElementById('focusMoveList');
+    fcWhitePieces   = document.getElementById('fcWhitePieces');
+    fcBlackPieces   = document.getElementById('fcBlackPieces');
+    focusExitBtn    = document.getElementById('focusExitBtn');
+
+    if (focusBtn)     focusBtn.addEventListener('click', toggleFocus);
+    if (focusExitBtn) focusExitBtn.addEventListener('click', () => { focusMode = true; toggleFocus(); });
+
 
     buildBoard();
     bindControls();
@@ -94,6 +124,34 @@ function init() {
     selectTheme(activeTheme);
     refreshUnlockDisplay();
     startNewGame();
+}
+
+function toggleFocus() {
+    focusMode = !focusMode;
+    document.body.classList.toggle('focus-active', focusMode);
+    if (focusOverlay) focusOverlay.setAttribute('aria-hidden', String(!focusMode));
+
+    if (focusMode) {
+        // Move real board into focus shell
+        const realShell = document.querySelector('.board-shell');
+        if (realShell && focusBoardShell) {
+            focusBoardShell.innerHTML = '';
+            focusBoardShell.appendChild(realShell);
+        }
+        syncFocusSidebar();
+    } else {
+        // Return board to normal layout
+        const boardWrap = document.querySelector('.board-wrapper');
+        const realShell = focusBoardShell ? focusBoardShell.querySelector('.board-shell') : null;
+        if (realShell && boardWrap) {
+            const overlay = boardWrap.querySelector('#boardOverlay');
+            if (overlay) {
+                boardWrap.insertBefore(realShell, overlay.parentNode.contains(overlay) ? overlay.nextSibling : null);
+            } else {
+                boardWrap.insertBefore(realShell, boardWrap.querySelector('.info-row'));
+            }
+        }
+    }
 }
 
 function buildBoard() {
@@ -190,6 +248,7 @@ function renderThemes() {
 function selectTheme(id) {
     activeTheme = id;
     document.querySelectorAll('.theme-card').forEach(c => c.classList.toggle('active', Number(c.dataset.theme) === id));
+    // Apply theme class to whichever shell is currently active
     const shell = document.querySelector('.board-shell');
     if (shell) {
         shell.className = `board-shell theme-${id}`;
@@ -202,7 +261,10 @@ function startNewGame() {
     selectedSquare = null;
     legalMovesCache = [];
     gameOver = false;
+    capturedByWhite = [];
+    capturedByBlack = [];
     moveListEl.innerHTML = '';
+    if (focusMoveList) focusMoveList.innerHTML = '';
     resetTimers();
     refreshBoard();
     updateStatus('New game ready');
@@ -315,12 +377,57 @@ function makeAIMove() {
 }
 
 function applyMoveAndUpdate(move, actor) {
+    // Track capture before applying
+    const targetPiece = engine.getPiece(move.to.row, move.to.col);
+    if (targetPiece) {
+        if (engine.turn === 'w') capturedByWhite.push(targetPiece.type);
+        else capturedByBlack.push(targetPiece.type);
+    }
+    if (move.enPassantCapture) {
+        if (engine.turn === 'w') capturedByWhite.push('p');
+        else capturedByBlack.push('p');
+    }
     engine.applyMove(move);
     lastMoveSquares = [engine.coordsToSquare(move.from.row, move.from.col), engine.coordsToSquare(move.to.row, move.to.col)];
     pushMoveToList(move, actor);
     refreshBoard();
     updateStatus();
     switchTimer();
+    if (focusMode) syncFocusSidebar();
+}
+
+function syncFocusSidebar() {
+    if (!focusMode) return;
+
+    // Clocks
+    const wTime = timeControl === 'untimed' ? '--:--' : formatTime(timers.w);
+    const bTime = timeControl === 'untimed' ? '--:--' : formatTime(timers.b);
+    if (focusTimeW) focusTimeW.textContent = wTime;
+    if (focusTimeB) focusTimeB.textContent = bTime;
+
+    // Active clock highlight
+    if (focusClockW) focusClockW.classList.toggle('active', engine.turn === 'w' && !gameOver);
+    if (focusClockB) focusClockB.classList.toggle('active', engine.turn === 'b' && !gameOver);
+
+    // Status & turn
+    if (focusStatusText) focusStatusText.textContent = statusText ? statusText.textContent : '';
+    if (focusTurnText) focusTurnText.textContent = engine.turn === 'w' ? 'White' : 'Black';
+
+    // Mirror move list
+    if (focusMoveList && moveListEl) {
+        focusMoveList.innerHTML = moveListEl.innerHTML;
+        focusMoveList.scrollTop = focusMoveList.scrollHeight;
+    }
+
+    // Captured pieces
+    const pieceLabel = { p:'♟', n:'♞', b:'♝', r:'♜', q:'♛' };
+    const wPieceLabel = { p:'♙', n:'♘', b:'♗', r:'♖', q:'♕' };
+    if (fcWhitePieces) {
+        fcWhitePieces.textContent = capturedByWhite.map(t => wPieceLabel[t] || t).join(' ') || '—';
+    }
+    if (fcBlackPieces) {
+        fcBlackPieces.textContent = capturedByBlack.map(t => pieceLabel[t] || t).join(' ') || '—';
+    }
 }
 
 function updateStatus(manualText) {
@@ -370,6 +477,7 @@ function updateStatus(manualText) {
             statusText.textContent = 'Game in progress';
         }
     }
+    if (focusMode) syncFocusSidebar();
 }
 
 function pushMoveToList(move, actor) {
@@ -457,10 +565,16 @@ function updateClockDisplays() {
     if (timeControl === 'untimed') {
         clockEls.w.textContent = '--:--';
         clockEls.b.textContent = '--:--';
+        if (focusTimeW) focusTimeW.textContent = '--:--';
+        if (focusTimeB) focusTimeB.textContent = '--:--';
         return;
     }
     clockEls.w.textContent = formatTime(timers.w);
     clockEls.b.textContent = formatTime(timers.b);
+    if (focusTimeW) focusTimeW.textContent = formatTime(timers.w);
+    if (focusTimeB) focusTimeB.textContent = formatTime(timers.b);
+    if (focusClockW) focusClockW.classList.toggle('active', engine.turn === 'w' && !gameOver);
+    if (focusClockB) focusClockB.classList.toggle('active', engine.turn === 'b' && !gameOver);
 }
 
 function formatTime(seconds) {

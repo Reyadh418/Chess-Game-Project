@@ -431,5 +431,3 @@ class ChessEngine {
         }));
     }
 }
-
-export { ChessEngine };
