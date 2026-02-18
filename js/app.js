@@ -34,6 +34,9 @@ let focusTimeBlack;
 let focusCapturedWhite;
 let focusCapturedBlack;
 let isFocusMode = false;
+let toastContainer;
+let audioCtx = null;
+let lastInCheck = false;
 
 let engine = new ChessEngine();
 let ai = new AiPlayer('easy');
@@ -65,6 +68,7 @@ let timers = { w: null, b: null };
 let timerInterval = null;
 let lastTick = null;
 let gameOver = false;
+let gameStarted = false;
 
 const themes = [
     { id: 0, name: 'Polished Quartz', light: '#f7f8fc', dark: '#cad1e5' },
@@ -119,6 +123,7 @@ function init() {
     focusTimeBlack = document.getElementById('focusTimeBlack');
     focusCapturedWhite = document.getElementById('focusCapturedWhite');
     focusCapturedBlack = document.getElementById('focusCapturedBlack');
+    toastContainer = document.getElementById('toastContainer');
 
     unlockCount = loadUnlocks();
 
@@ -164,6 +169,7 @@ function bindControls() {
     modePvpButton.addEventListener('click', () => setMode('pvp'));
     document.querySelectorAll('#aiControls .seg').forEach(btn => {
         btn.addEventListener('click', () => {
+            if (gameStarted) return;
             document.querySelectorAll('#aiControls .seg').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             ai.setDifficulty(btn.dataset.difficulty);
@@ -172,6 +178,7 @@ function bindControls() {
 
     timeButtons.forEach(btn => {
         btn.addEventListener('click', () => {
+            if (gameStarted) return;
             timeButtons.forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             timeControl = btn.dataset.time;
@@ -212,6 +219,7 @@ function bindControls() {
 }
 
 function setMode(nextMode) {
+    if (gameStarted) return;
     if (mode === nextMode) return;
     mode = nextMode;
     modeAIButton.classList.toggle('active', nextMode === 'ai');
@@ -238,8 +246,9 @@ function renderThemes() {
 
         const locked = theme.id + 1 > unlockCount;
         card.classList.toggle('locked', locked);
+        card.classList.toggle('locked-control', gameStarted);
         card.querySelector('.lock').textContent = locked ? 'Locked' : 'Unlocked';
-        if (!locked) {
+        if (!locked && !gameStarted) {
             card.addEventListener('click', () => selectTheme(theme.id));
         }
         if (activeTheme === theme.id) {
@@ -250,6 +259,7 @@ function renderThemes() {
 }
 
 function selectTheme(id) {
+    if (gameStarted) return;
     activeTheme = id;
     document.querySelectorAll('.theme-card').forEach(c => c.classList.toggle('active', Number(c.dataset.theme) === id));
     const themeClass = `board-shell theme-${id}`;
@@ -264,12 +274,14 @@ function startNewGame() {
     selectedSquare = null;
     legalMovesCache = [];
     gameOver = false;
+    gameStarted = false;
     capturedPieces = { w: [], b: [] };
     if (moveListEl) moveListEl.innerHTML = '';
     if (focusMoveList) focusMoveList.innerHTML = '';
     renderCaptured();
     resetTimers();
     refreshBoard();
+    setControlsLocked(false);
     updateStatus('New game ready');
     if (mode === 'ai' && engine.turn === 'b') {
         makeAIMove();
@@ -382,12 +394,22 @@ function makePlayerMove(move) {
 
 function makeAIMove() {
     if (gameOver) return;
-    const move = ai.chooseMove(engine);
-    if (!move) {
+    const legalMoves = engine.generateLegalMoves(engine.turn);
+    if (!legalMoves.length) {
         updateStatus('AI has no moves');
         return;
     }
-    applyMoveAndUpdate(move, 'ai');
+
+    const thinkMs = getAiDelay(ai.difficulty || 'easy', legalMoves.length);
+    setTimeout(() => {
+        if (gameOver) return;
+        const move = ai.chooseMove(engine);
+        if (!move) {
+            updateStatus('AI has no moves');
+            return;
+        }
+        applyMoveAndUpdate(move, 'ai');
+    }, thinkMs);
 }
 
 function applyMoveAndUpdate(move, actor) {
@@ -402,6 +424,11 @@ function applyMoveAndUpdate(move, actor) {
 
     engine.applyMove(move);
 
+    if (!gameStarted) {
+        gameStarted = true;
+        setControlsLocked(true);
+    }
+
     if (taken) {
         // The piece was taken by the opponent of the taken piece
         const capturedBy = taken.color === 'w' ? 'b' : 'w';
@@ -413,6 +440,13 @@ function applyMoveAndUpdate(move, actor) {
     refreshBoard();
     updateStatus();
     switchTimer();
+
+    // audio feedback
+    if (taken) {
+        playSound('capture');
+    } else {
+        playSound('move');
+    }
 }
 
 function updateStatus(manualText) {
@@ -430,6 +464,8 @@ function updateStatus(manualText) {
         [statusText, focusStatusText].forEach(el => { if (el) el.textContent = msg; });
         gameOver = true;
         stopTimer();
+        showToast(msg, 'success');
+        playSound('gameover');
         if (mode === 'ai' && state.winner === 'w') {
             unlockCount = Math.min(10, unlockCount + 1);
             saveUnlocks();
@@ -443,13 +479,20 @@ function updateStatus(manualText) {
         [statusText, focusStatusText].forEach(el => { if (el) el.textContent = 'Draw by stalemate'; });
         gameOver = true;
         stopTimer();
+        showToast('Draw by stalemate', 'info');
+        playSound('gameover');
         return;
     }
 
     if (state.inCheck) {
         [statusText, focusStatusText].forEach(el => { if (el) el.textContent = `${turnLabel} is in check`; });
+        if (!lastInCheck) {
+            playSound('check');
+        }
+        lastInCheck = true;
     } else {
         [statusText, focusStatusText].forEach(el => { if (el) el.textContent = 'Game in progress'; });
+        lastInCheck = false;
     }
 }
 
@@ -469,6 +512,28 @@ function pushMoveToList(move, actor) {
         const clone = li.cloneNode(true);
         el.appendChild(clone);
         el.scrollTop = el.scrollHeight;
+    });
+}
+
+function setControlsLocked(locked) {
+    const bool = !!locked;
+    [modeAIButton, modePvpButton, newGameBtn, resetProgressBtn].forEach(btn => {
+        if (btn && btn !== newGameBtn && btn !== resetProgressBtn) {
+            btn.disabled = bool;
+            btn.classList.toggle('locked-control', bool);
+        }
+    });
+    document.querySelectorAll('#aiControls .seg').forEach(btn => {
+        btn.disabled = bool;
+        btn.classList.toggle('locked-control', bool);
+    });
+    timeButtons.forEach(btn => {
+        btn.disabled = bool;
+        btn.classList.toggle('locked-control', bool);
+    });
+    document.querySelectorAll('.theme-card').forEach(card => {
+        card.classList.toggle('locked-control', bool);
+        card.style.pointerEvents = bool ? 'none' : '';
     });
 }
 
@@ -528,6 +593,8 @@ function handleFlagFall(color) {
     const winner = color === 'w' ? 'Black' : 'White';
     const msg = `${winner} wins on time`;
     [statusText, focusStatusText].forEach(el => { if (el) el.textContent = msg; });
+    showToast(msg, 'warn');
+    playSound('gameover');
 }
 
 function stopTimer() {
@@ -554,6 +621,78 @@ function formatTime(seconds) {
     const mins = Math.floor(s / 60);
     const secs = s % 60;
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
+function getAiDelay(difficulty, legalCount) {
+    const clamp = (v, min, max) => Math.min(Math.max(v, min), max);
+    const complexities = clamp(legalCount / 30, 0, 1); // 0 to 1 based on move count
+
+    const ranges = {
+        easy: [300, 900],      // casual
+        medium: [550, 1300],   // balanced
+        hard: [900, 2200],     // deeper search
+    };
+    const [min, max] = ranges[difficulty] || ranges.medium;
+    const base = min + Math.random() * (max - min);
+
+    // Add a small complexity bump so busier positions take longer
+    const bump = complexities * (difficulty === 'hard' ? 600 : difficulty === 'medium' ? 400 : 250);
+    return Math.floor(base + bump);
+}
+
+/* ── Toasts ── */
+function showToast(message, variant = 'info') {
+    if (!toastContainer) return;
+    const div = document.createElement('div');
+    div.className = `toast ${variant}`;
+    div.textContent = message;
+    toastContainer.appendChild(div);
+    setTimeout(() => {
+        div.remove();
+    }, 4000);
+}
+
+/* ── Sounds ── */
+function ensureAudio() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+    return audioCtx;
+}
+
+function playTone({ freq = 440, duration = 0.12, volume = 0.15, type = 'sine' }) {
+    const ctx = ensureAudio();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    gain.gain.value = volume;
+    osc.connect(gain).connect(ctx.destination);
+    const now = ctx.currentTime;
+    gain.gain.setValueAtTime(volume, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+    osc.start(now);
+    osc.stop(now + duration + 0.02);
+}
+
+function playSound(kind) {
+    const sounds = {
+        move: () => playTone({ freq: 540, duration: 0.09, volume: 0.12, type: 'sine' }),
+        capture: () => {
+            playTone({ freq: 360, duration: 0.12, volume: 0.16, type: 'square' });
+            setTimeout(() => playTone({ freq: 280, duration: 0.08, volume: 0.12, type: 'square' }), 40);
+        },
+        check: () => playTone({ freq: 880, duration: 0.14, volume: 0.14, type: 'triangle' }),
+        gameover: () => {
+            playTone({ freq: 240, duration: 0.18, volume: 0.18, type: 'sawtooth' });
+            setTimeout(() => playTone({ freq: 180, duration: 0.18, volume: 0.16, type: 'sawtooth' }), 90);
+        },
+    };
+    const fn = sounds[kind];
+    if (fn) fn();
 }
 
 /* ── Captured pieces ── */
