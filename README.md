@@ -4,7 +4,7 @@ A polished, single-page chess experience with Player vs AI and pass-and-play mod
 
 ## Features
 - **Game modes:** Player vs AI or local pass & play.
-- **AI levels:** Easy (random), Medium (shallow search), Hard (deeper minimax with alpha-beta) plus deliberate move timing.
+- **AI levels:** Easy (random), Medium/Hard powered by Stockfish (browser worker) with a built-in minimax fallback if Stockfish cannot load.
 - **Time controls:** Untimed, 3:00, or 10:00 per side with flag-fall detection.
 - **Focus Mode:** Distraction-free view with clocks, captured pieces, move list, and exit button.
 - **Board skins & unlocks:** 10 themes; 1 is free and the rest unlock as you beat the AI (progress stored in localStorage under `aurumUnlocks`).
@@ -29,13 +29,14 @@ If you run from the file system and hit storage/audio permission issues, open vi
 - `index.html` — page layout and templates.
 - `styles/main.css` — glassy UI, board/piece styling, focus mode, toasts.
 - `js/app.js` — UI wiring, game flow, timers, focus mode, unlock logic, sounds.
-- `js/ai.js` — AI move selection (random/heuristic/minimax with alpha-beta and evaluation).
-- `js/chessEngine.js` — chess rules: legal move generation, castling, en passant, promotion, check/checkmate/stalemate detection, move history.
+- `js/ai.js` — AI move selection with Stockfish UCI worker integration plus minimax fallback.
+- `js/chessEngine.js` — chess rules, move history, and FEN export for external engine analysis.
 
 ## Notes
 - Progress is stored locally; clearing site data resets unlocks.
 - Sounds use the Web Audio API and may require a user gesture to start on some browsers.
 - The engine treats a missing king as in check to guard against corrupted states.
+- Stockfish is loaded at runtime from jsDelivr (`stockfish.js`). If the CDN is blocked/offline, AI falls back to the built-in engine automatically.
 
 ## Contributing
 Bug reports and small improvements are welcome. Please keep dependencies zero and stay within vanilla JS/HTML/CSS.

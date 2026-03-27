@@ -431,6 +431,60 @@ class ChessEngine {
             return { ...cell, square: this.coordsToSquare(r, c) };
         }));
     }
+
+    getFen() {
+        const rows = [];
+        for (let row = 0; row < 8; row++) {
+            let emptyCount = 0;
+            let fenRow = '';
+            for (let col = 0; col < 8; col++) {
+                const piece = this.getPiece(row, col);
+                if (!piece) {
+                    emptyCount += 1;
+                    continue;
+                }
+                if (emptyCount > 0) {
+                    fenRow += String(emptyCount);
+                    emptyCount = 0;
+                }
+                const symbol = piece.color === 'w' ? piece.type.toUpperCase() : piece.type;
+                fenRow += symbol;
+            }
+            if (emptyCount > 0) {
+                fenRow += String(emptyCount);
+            }
+            rows.push(fenRow);
+        }
+
+        const boardPart = rows.join('/');
+        const turnPart = this.turn;
+        const castlingPart = this.getCastlingRights();
+        const enPassantPart = this.enPassantTarget ? this.coordsToSquare(this.enPassantTarget.row, this.enPassantTarget.col) : '-';
+        return `${boardPart} ${turnPart} ${castlingPart} ${enPassantPart} ${this.halfmoveClock} ${this.fullmoveNumber}`;
+    }
+
+    getCastlingRights() {
+        let rights = '';
+
+        const whiteKing = this.getPiece(7, 4);
+        const whiteRookKing = this.getPiece(7, 7);
+        const whiteRookQueen = this.getPiece(7, 0);
+        const blackKing = this.getPiece(0, 4);
+        const blackRookKing = this.getPiece(0, 7);
+        const blackRookQueen = this.getPiece(0, 0);
+
+        if (whiteKing && whiteKing.type === 'k' && whiteKing.color === 'w' && !whiteKing.hasMoved) {
+            if (whiteRookKing && whiteRookKing.type === 'r' && whiteRookKing.color === 'w' && !whiteRookKing.hasMoved) rights += 'K';
+            if (whiteRookQueen && whiteRookQueen.type === 'r' && whiteRookQueen.color === 'w' && !whiteRookQueen.hasMoved) rights += 'Q';
+        }
+
+        if (blackKing && blackKing.type === 'k' && blackKing.color === 'b' && !blackKing.hasMoved) {
+            if (blackRookKing && blackRookKing.type === 'r' && blackRookKing.color === 'b' && !blackRookKing.hasMoved) rights += 'k';
+            if (blackRookQueen && blackRookQueen.type === 'r' && blackRookQueen.color === 'b' && !blackRookQueen.hasMoved) rights += 'q';
+        }
+
+        return rights || '-';
+    }
 }
 
 export { ChessEngine };

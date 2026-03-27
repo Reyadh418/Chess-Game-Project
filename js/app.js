@@ -69,6 +69,7 @@ let timerInterval = null;
 let lastTick = null;
 let gameOver = false;
 let gameStarted = false;
+let aiMoveToken = 0;
 
 const themes = [
     { id: 0, name: 'Polished Quartz', light: '#f7f8fc', dark: '#cad1e5' },
@@ -191,6 +192,7 @@ function bindControls() {
     document.getElementById('exitFocusBtn').addEventListener('click', () => toggleFocusMode(false));
     document.getElementById('focusUndoBtn').addEventListener('click', () => {
         if (engine.history.length === 0 || gameOver) return;
+        aiMoveToken += 1;
         engine.undo();
         if (mode === 'ai' && engine.turn === 'b' && engine.history.length) {
             engine.undo();
@@ -207,6 +209,7 @@ function bindControls() {
     });
     undoBtn.addEventListener('click', () => {
         if (engine.history.length === 0 || gameOver) return;
+        aiMoveToken += 1;
         engine.undo();
         // If undoing after AI moved, undo twice to revert to player turn
         if (mode === 'ai' && engine.turn === 'b' && engine.history.length) {
@@ -269,6 +272,7 @@ function selectTheme(id) {
 }
 
 function startNewGame() {
+    aiMoveToken += 1;
     engine.reset();
     lastMoveSquares = [];
     selectedSquare = null;
@@ -400,16 +404,25 @@ function makeAIMove() {
         return;
     }
 
+    const token = ++aiMoveToken;
     const thinkMs = getAiDelay(ai.difficulty || 'easy', legalMoves.length);
-    setTimeout(() => {
-        if (gameOver) return;
-        const move = ai.chooseMove(engine);
-        if (!move) {
-            updateStatus('AI has no moves');
-            return;
-        }
-        applyMoveAndUpdate(move, 'ai');
-    }, thinkMs);
+    updateStatus('AI thinking...');
+
+    ai.chooseMove(engine, { thinkTimeMs: thinkMs })
+        .then(move => {
+            if (gameOver || token !== aiMoveToken) return;
+            if (!move) {
+                updateStatus('AI has no moves');
+                return;
+            }
+            applyMoveAndUpdate(move, 'ai');
+        })
+        .catch(err => {
+            if (token !== aiMoveToken) return;
+            console.error('AI move failed', err);
+            updateStatus('AI failed to move');
+            showToast('AI move failed. Try starting a new game.', 'danger');
+        });
 }
 
 function applyMoveAndUpdate(move, actor) {
