@@ -76,6 +76,7 @@ const storage = {
 };
 
 const MATCH_SETTINGS_KEY = 'aurumMatchSettings';
+const REVIEW_STORAGE_KEY = 'aurumLastReviewGame';
 
 let unlockCount = 1;
 let timeControl = 'untimed';
@@ -246,7 +247,8 @@ function bindControls() {
     if (reviewGameBtn) {
         reviewGameBtn.addEventListener('click', () => {
             if (!gameMoves.length) return;
-            launchGameReview(false);
+            persistReviewSnapshot();
+            window.location.href = 'review.html';
         });
     }
     if (reviewBackdrop) reviewBackdrop.addEventListener('click', closeReviewModal);
@@ -675,6 +677,7 @@ function applyMoveAndUpdate(move, actor) {
         notation: formatMoveNotation(move, actor),
         uci: toUciMove(move),
     });
+    persistReviewSnapshot();
     pushMoveToList(move, actor);
     refreshBoard();
     updateStatus();
@@ -713,8 +716,8 @@ function updateStatus(manualText) {
             refreshUnlockDisplay();
         }
         gameResultText = msg;
+        persistReviewSnapshot();
         updateReviewButtonState();
-        launchGameReview(true);
         return;
     }
 
@@ -725,8 +728,8 @@ function updateStatus(manualText) {
         showToast('Draw by stalemate', 'info');
         playSound('gameover');
         gameResultText = 'Draw by stalemate';
+        persistReviewSnapshot();
         updateReviewButtonState();
-        launchGameReview(true);
         return;
     }
 
@@ -891,8 +894,8 @@ function handleFlagFall(color) {
     showToast(msg, 'warn');
     playSound('gameover');
     gameResultText = msg;
+    persistReviewSnapshot();
     updateReviewButtonState();
-    launchGameReview(true);
 }
 
 function stopTimer() {
@@ -927,8 +930,34 @@ function confirmResignMatch() {
     showToast('Match resigned', 'warn');
     playSound('gameover');
     gameResultText = msg;
+    persistReviewSnapshot();
     updateReviewButtonState();
-    launchGameReview(true);
+}
+
+function persistReviewSnapshot() {
+    if (!gameMoves.length) return;
+
+    const payload = {
+        savedAt: Date.now(),
+        result: gameResultText || '',
+        mode,
+        difficulty: ai.difficulty || 'easy',
+        timeControl,
+        theme: activeTheme,
+        humanColor,
+        aiColor,
+        moves: gameMoves.map(item => ({
+            actor: item.actor,
+            moverColor: item.moverColor,
+            moveNumber: item.moveNumber,
+            preFen: item.preFen,
+            postFen: item.postFen,
+            notation: item.notation,
+            uci: item.uci,
+        })),
+    };
+
+    storage.set(REVIEW_STORAGE_KEY, JSON.stringify(payload));
 }
 
 function updateClockDisplays() {
