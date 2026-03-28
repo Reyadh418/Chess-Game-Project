@@ -5,6 +5,7 @@ class StockfishClient {
         this.worker = null;
         this.pending = [];
         this.ready = false;
+        this.lineListeners = new Set();
     }
 
     supportsWorkers() {
@@ -30,6 +31,14 @@ class StockfishClient {
         this.worker.onmessage = event => {
             const line = String(event.data || '').trim();
             if (!line) return;
+
+            this.lineListeners.forEach(listener => {
+                try {
+                    listener(line);
+                } catch (_) {
+                    // Listener errors should not break worker message processing.
+                }
+            });
 
             for (let i = 0; i < this.pending.length; i++) {
                 const waiter = this.pending[i];
@@ -64,6 +73,14 @@ class StockfishClient {
         this.worker.postMessage(command);
     }
 
+    onLine(listener) {
+        this.lineListeners.add(listener);
+    }
+
+    offLine(listener) {
+        this.lineListeners.delete(listener);
+    }
+
     waitFor(test, timeoutMs = 5000) {
         return new Promise((resolve, reject) => {
             const waiter = { test, resolve, reject };
@@ -91,10 +108,11 @@ class StockfishClient {
     async getBestMove(fen, options = {}) {
         const moveTimeMs = Math.max(150, Number(options.moveTimeMs) || 700);
         const skillLevel = Math.min(20, Math.max(0, Number(options.skillLevel) || 10));
+        const limitStrength = options.limitStrength !== false;
         await this.init();
 
         this.send(`setoption name Skill Level value ${skillLevel}`);
-        this.send('setoption name UCI_LimitStrength value true');
+        this.send(`setoption name UCI_LimitStrength value ${limitStrength ? 'true' : 'false'}`);
         this.send('isready');
         await this.waitFor(line => line === 'readyok', 5000);
 
@@ -105,6 +123,66 @@ class StockfishClient {
         const best = parts[1];
         if (!best || best === '(none)') return null;
         return best;
+    }
+
+    async analyzePosition(fen, options = {}) {
+        const moveTimeMs = Math.max(120, Number(options.moveTimeMs) || 250);
+        const skillLevel = Math.min(20, Math.max(0, Number(options.skillLevel) || 20));
+        await this.init();
+
+        this.send(`setoption name Skill Level value ${skillLevel}`);
+        this.send('setoption name UCI_LimitStrength value false');
+        this.send('isready');
+        await this.waitFor(line => line === 'readyok', 5000);
+
+        let latestScore = null;
+        const infoListener = line => {
+            if (!line.startsWith('info ') || !line.includes(' score ')) return;
+            const parsed = this.parseScoreLine(line);
+            if (parsed) {
+                latestScore = parsed;
+            }
+        };
+
+        this.onLine(infoListener);
+        try {
+            this.send(`position fen ${fen}`);
+            this.send(`go movetime ${moveTimeMs}`);
+            const bestLine = await this.waitFor(line => line.startsWith('bestmove '), moveTimeMs + 5000);
+            const parts = bestLine.split(/\s+/);
+            const bestMove = parts[1] && parts[1] !== '(none)' ? parts[1] : null;
+            const normalized = this.normalizeScore(latestScore);
+            return {
+                bestMove,
+                scoreCp: normalized,
+                rawScore: latestScore,
+            };
+        } finally {
+            this.offLine(infoListener);
+        }
+    }
+
+    parseScoreLine(line) {
+        const cpMatch = line.match(/score cp (-?\d+)/);
+        if (cpMatch) {
+            return { type: 'cp', value: Number(cpMatch[1]) };
+        }
+        const mateMatch = line.match(/score mate (-?\d+)/);
+        if (mateMatch) {
+            return { type: 'mate', value: Number(mateMatch[1]) };
+        }
+        return null;
+    }
+
+    normalizeScore(score) {
+        if (!score) return 0;
+        if (score.type === 'cp') return score.value;
+        if (score.type === 'mate') {
+            const sign = score.value > 0 ? 1 : -1;
+            const distance = Math.max(0, 10 - Math.min(Math.abs(score.value), 10));
+            return sign * (10000 - distance * 100);
+        }
+        return 0;
     }
 }
 
@@ -143,15 +221,23 @@ class AiPlayer {
             return this.pickShallow(engine, legalMoves, color, 2);
         }
 
-        return this.minimaxRoot(engine, legalMoves, color, 3);
+        if (this.difficulty === 'hard') {
+            return this.minimaxRoot(engine, legalMoves, color, 3);
+        }
+
+        return this.minimaxRoot(engine, legalMoves, color, 4);
     }
 
     async chooseWithStockfish(engine, legalMoves, options = {}) {
         const fen = engine.getFen();
         const moveTimeMs = Math.max(150, Number(options.thinkTimeMs) || 700);
-        const skillMap = { medium: 10, hard: 18 };
+        const skillMap = { medium: 10, hard: 18, grandmaster: 20 };
         const skillLevel = skillMap[this.difficulty] ?? 10;
-        const uciMove = await this.stockfish.getBestMove(fen, { moveTimeMs, skillLevel });
+        const uciMove = await this.stockfish.getBestMove(fen, {
+            moveTimeMs,
+            skillLevel,
+            limitStrength: this.difficulty !== 'grandmaster',
+        });
         if (!uciMove) return null;
         return this.mapUciToLegalMove(uciMove, legalMoves);
     }
@@ -263,4 +349,4 @@ class AiPlayer {
     }
 }
 
-export { AiPlayer };
+export { AiPlayer, StockfishClient };

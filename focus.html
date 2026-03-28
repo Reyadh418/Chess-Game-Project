@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aurum Chess - Match</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles/main.css">
+</head>
+<body class="focus-active">
+    <div class="focus-layout active" id="focusLayout">
+        <div class="focus-board-area">
+            <div class="board-shell" id="focusBoardShell">
+                <div class="board" id="focusBoard"></div>
+                <div class="board-overlay"></div>
+            </div>
+        </div>
+
+        <div class="focus-center">
+            <div class="focus-clock">
+                <span class="tag">Black</span>
+                <span class="time" id="focusTimeBlack">--:--</span>
+            </div>
+
+            <div class="focus-captured">
+                <p class="label">Captured by White</p>
+                <div class="captured-row" id="focusCapturedWhite"></div>
+            </div>
+
+            <div class="focus-vs">VS</div>
+
+            <div class="focus-captured">
+                <p class="label">Captured by Black</p>
+                <div class="captured-row" id="focusCapturedBlack"></div>
+            </div>
+
+            <div class="focus-clock">
+                <span class="tag">White</span>
+                <span class="time" id="focusTimeWhite">--:--</span>
+            </div>
+        </div>
+
+        <div class="focus-right panel">
+            <div class="focus-info">
+                <div class="status">
+                    <p class="label">Status</p>
+                    <p class="value" id="focusStatusText">Ready</p>
+                </div>
+                <div class="status">
+                    <p class="label">Turn</p>
+                    <p class="value" id="focusTurnText">White</p>
+                </div>
+            </div>
+            <div class="label-row">
+                <p class="label">Move List</p>
+                <button class="ghost" id="focusUndoBtn">Undo</button>
+            </div>
+            <ol id="focusMoveList" class="move-list"></ol>
+            <button id="resignBtn" class="resign secondary">Resign Match</button>
+            <div class="focus-post-actions" id="focusPostActions">
+                <button id="reviewGameBtn" class="ghost post-match-action" disabled>Review Game</button>
+                <button class="ghost exit-focus-btn post-match-action" id="exitFocusBtn">Exit Match</button>
+            </div>
+            <button id="newGameBtn" class="primary">New Match</button>
+        </div>
+    </div>
+
+    <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+
+    <div id="resignModal" class="resign-modal" aria-hidden="true">
+        <div id="resignBackdrop" class="resign-backdrop"></div>
+        <section class="resign-panel" role="dialog" aria-modal="true" aria-labelledby="resignTitle">
+            <h2 id="resignTitle">Resign Match?</h2>
+            <p class="resign-message">Are you sure you want to resign? This will end the match immediately and count as a loss.</p>
+            <div class="resign-actions">
+                <button id="cancelResignBtn" class="ghost">Cancel</button>
+                <button id="confirmResignBtn" class="danger">Resign</button>
+            </div>
+        </section>
+    </div>
+
+    <div id="reviewModal" class="review-modal" aria-hidden="true">
+        <div id="reviewBackdrop" class="review-backdrop"></div>
+        <section class="review-panel" role="dialog" aria-modal="true" aria-labelledby="reviewTitle">
+            <header class="review-header">
+                <div>
+                    <p class="label">Post-Game Analysis</p>
+                    <h2 id="reviewTitle">Stockfish Review</h2>
+                </div>
+                <button id="closeReviewBtn" class="ghost" type="button">Close</button>
+            </header>
+            <p id="reviewSummary" class="review-summary">Waiting for analysis...</p>
+            <div id="reviewProgress" class="review-progress">Preparing Stockfish review...</div>
+            <ol id="reviewList" class="review-list"></ol>
+        </section>
+    </div>
+
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>

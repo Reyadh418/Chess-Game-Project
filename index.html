@@ -1,184 +1,88 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Aurum Chess</title>
-	<link rel="preconnect" href="https://fonts.googleapis.com">
-	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-	<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
-	<link rel="stylesheet" href="styles/main.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aurum Chess</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles/main.css">
 </head>
 <body>
-	<div class="hero-grid">
-		<header class="topbar">
-			<div>
-				<p class="eyebrow">Premium Chess Experience</p>
-				<h1>Aurum Chess</h1>
-			</div>
-			<div class="top-actions">
-				<button id="newGameBtn" class="primary">Start Game</button>
-				<button id="focusModeBtn" class="ghost">Focus Mode</button>
-				<button id="resetProgressBtn" class="ghost" title="Reset unlocks">Reset Unlocks</button>
-			</div>
-		</header>
+    <div class="hero-grid">
+        <header class="topbar">
+            <div>
+                <p class="eyebrow">Premium Chess Experience</p>
+                <h1>Aurum Chess</h1>
+            </div>
+            <div class="top-actions">
+                <button id="startGameBtn" class="primary">Start Game</button>
+                <button id="resetProgressBtn" class="ghost" title="Reset unlocks">Reset Unlocks</button>
+            </div>
+        </header>
 
-		<!-- ═══ Focus Mode Layout (hidden by default) ═══ -->
-		<div class="focus-layout" id="focusLayout">
-			<div class="focus-board-area">
-				<div class="board-shell" id="focusBoardShell">
-					<div class="board" id="focusBoard"></div>
-					<div class="board-overlay"></div>
-				</div>
-			</div>
+        <main class="layout home-layout">
+            <section class="panel controls">
+                <div class="control-block">
+                    <div class="label-row">
+                        <p class="label">Mode</p>
+                        <span class="pill">Setup</span>
+                    </div>
+                    <div class="segmented">
+                        <button data-mode="ai" class="seg active" id="modeAI">Player vs AI</button>
+                        <button data-mode="pvp" class="seg" id="modePvp">Pass & Play</button>
+                    </div>
+                </div>
 
-			<div class="focus-center">
-				<div class="focus-clock">
-					<span class="tag">Black</span>
-					<span class="time" id="focusTimeBlack">--:--</span>
-				</div>
+                <div class="control-block" id="aiControls">
+                    <p class="label">AI Difficulty</p>
+                    <div class="segmented small">
+                        <button data-difficulty="easy" class="seg active">Easy</button>
+                        <button data-difficulty="medium" class="seg">Medium</button>
+                        <button data-difficulty="hard" class="seg">Hard</button>
+                        <button data-difficulty="grandmaster" class="seg">Grandmaster</button>
+                    </div>
+                </div>
 
-				<div class="focus-captured">
-					<p class="label">Captured by White</p>
-					<div class="captured-row" id="focusCapturedWhite"></div>
-				</div>
+                <div class="control-block" id="playerColorControls" style="display: none;">
+                    <p class="label">Play As</p>
+                    <div class="chips">
+                        <button data-color="white" class="chip">White</button>
+                        <button data-color="black" class="chip">Black</button>
+                        <button data-color="random" class="chip active">Random</button>
+                    </div>
+                </div>
 
-				<div class="focus-vs">VS</div>
+                <div class="control-block">
+                    <p class="label">Time Mode</p>
+                    <div class="chips" id="timeControls">
+                        <button data-time="untimed" class="chip active">No clock</button>
+                        <button data-time="180" class="chip">3:00</button>
+                        <button data-time="600" class="chip">10:00</button>
+                    </div>
+                </div>
 
-				<div class="focus-captured">
-					<p class="label">Captured by Black</p>
-					<div class="captured-row" id="focusCapturedBlack"></div>
-				</div>
+                <div class="control-block">
+                    <div class="label-row">
+                        <p class="label">Board Skins</p>
+                        <span class="value" id="unlockText">1 / 10</span>
+                    </div>
+                    <div class="theme-grid" id="themeGrid"></div>
+                    <p class="hint">Select your setup and start. Matches now open in a dedicated match page.</p>
+                </div>
+            </section>
+        </main>
+    </div>
 
-				<div class="focus-clock">
-					<span class="tag">White</span>
-					<span class="time" id="focusTimeWhite">--:--</span>
-				</div>
-			</div>
+    <template id="themeCardTemplate">
+        <button class="theme-card">
+            <span class="swatch" aria-hidden="true"></span>
+            <span class="title"></span>
+            <span class="lock" aria-hidden="true">Locked</span>
+        </button>
+    </template>
 
-			<div class="focus-right panel">
-				<div class="focus-info">
-					<div class="status">
-						<p class="label">Status</p>
-						<p class="value" id="focusStatusText">Ready</p>
-					</div>
-					<div class="status">
-						<p class="label">Turn</p>
-						<p class="value" id="focusTurnText">White</p>
-					</div>
-				</div>
-				<div class="label-row">
-					<p class="label">Move List</p>
-					<button class="ghost" id="focusUndoBtn">Undo</button>
-				</div>
-				<ol id="focusMoveList" class="move-list"></ol>
-				<button class="ghost exit-focus-btn" id="exitFocusBtn">✕ Exit Focus</button>
-			</div>
-		</div>
-
-		<!-- ═══ Normal Layout ═══ -->
-		<main class="layout" id="normalLayout">
-			<section class="panel controls">
-				<div class="control-block">
-					<div class="label-row">
-						<p class="label">Mode</p>
-						<span class="pill">Realtime</span>
-					</div>
-					<div class="segmented">
-						<button data-mode="ai" class="seg active" id="modeAI">Player vs AI</button>
-						<button data-mode="pvp" class="seg" id="modePvp">Pass & Play</button>
-					</div>
-				</div>
-
-				<div class="control-block" id="aiControls">
-					<p class="label">AI Difficulty</p>
-					<div class="segmented small">
-						<button data-difficulty="easy" class="seg active">Easy</button>
-						<button data-difficulty="medium" class="seg">Medium</button>
-						<button data-difficulty="hard" class="seg">Hard</button>
-					</div>
-				</div>
-
-				<div class="control-block">
-					<p class="label">Time Mode</p>
-					<div class="chips" id="timeControls">
-						<button data-time="untimed" class="chip active">No clock</button>
-						<button data-time="180" class="chip">3:00</button>
-						<button data-time="600" class="chip">10:00</button>
-					</div>
-				</div>
-
-				<div class="control-block">
-					<p class="label">Board Skins</p>
-					<div class="theme-grid" id="themeGrid"></div>
-					<p class="hint">First board is free — win vs AI to unlock the remaining 9 designs.</p>
-				</div>
-			</section>
-
-			<section class="board-wrapper">
-				<div class="timers">
-					<div class="clock" id="clockBlack">
-						<span class="tag">Black</span>
-						<span class="time" id="timeBlack">--:--</span>
-					</div>
-					<div class="clock" id="clockWhite">
-						<span class="tag">White</span>
-						<span class="time" id="timeWhite">--:--</span>
-					</div>
-				</div>
-
-				<div class="board-shell">
-					<div class="board" id="board"></div>
-					<div class="board-overlay" id="boardOverlay"></div>
-				</div>
-
-				<div class="captured-bar">
-					<div class="captured-side">
-						<p class="label">Captured by White</p>
-						<div class="captured-row" id="capturedWhite"></div>
-					</div>
-					<div class="captured-side">
-						<p class="label">Captured by Black</p>
-						<div class="captured-row" id="capturedBlack"></div>
-					</div>
-				</div>
-
-				<div class="info-row">
-					<div class="status">
-						<p class="label">Status</p>
-						<p class="value" id="statusText">Ready</p>
-					</div>
-					<div class="status">
-						<p class="label">Turn</p>
-						<p class="value" id="turnText">White</p>
-					</div>
-					<div class="status">
-						<p class="label">Unlocks</p>
-						<p class="value" id="unlockText">1 / 10</p>
-					</div>
-				</div>
-			</section>
-
-			<section class="panel moves">
-				<div class="label-row">
-					<p class="label">Move List</p>
-					<button class="ghost" id="undoBtn">Undo</button>
-				</div>
-				<ol id="moveList" class="move-list"></ol>
-			</section>
-		</main>
-	</div>
-
-	<template id="themeCardTemplate">
-		<button class="theme-card">
-			<span class="swatch" aria-hidden="true"></span>
-			<span class="title"></span>
-			<span class="lock" aria-hidden="true">Locked</span>
-		</button>
-	</template>
-
-	<div id="toastContainer" class="toast-container" aria-live="polite"></div>
-
-	<script type="module" src="js/app.js"></script>
+    <script type="module" src="js/home.js"></script>
 </body>
 </html>
