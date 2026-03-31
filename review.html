@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aurum Chess - Game Review</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles/main.css">
+</head>
+<body class="review-page-body">
+    <main class="review-layout">
+        <section class="review-board-area panel">
+            <div class="review-head">
+                <div>
+                    <p class="eyebrow">Post-Game Review</p>
+                    <h1>Move Explorer</h1>
+                </div>
+                <button id="backToMatchBtn" class="ghost">Back to Match</button>
+            </div>
+
+            <div class="board-shell" id="reviewBoardShell">
+                <div class="board" id="reviewBoard"></div>
+            </div>
+
+            <div class="review-controls" id="reviewControls">
+                <button id="firstMoveBtn" class="ghost">|&lt;</button>
+                <button id="prevMoveBtn" class="ghost">&lt;</button>
+                <button id="playPauseBtn" class="ghost">Play</button>
+                <button id="nextMoveBtn" class="ghost">&gt;</button>
+                <button id="lastMoveBtn" class="ghost">&gt;|</button>
+            </div>
+
+            <div class="review-summary-row">
+                <p class="review-result" id="reviewResult">No reviewed game found.</p>
+                <p class="review-progress" id="reviewProgressText">Move 0 / 0</p>
+            </div>
+        </section>
+
+        <aside class="review-side panel">
+            <div class="review-meta" id="reviewMeta"></div>
+            <ol class="review-move-list" id="reviewMoveList"></ol>
+            <p class="review-empty" id="reviewEmpty">Finish a game first, then open review.</p>
+        </aside>
+    </main>
+
+    <script type="module" src="js/review.js"></script>
+</body>
+</html>

@@ -1,5 +1,5 @@
 import { ChessEngine } from './chessEngine.js';
-import { AiPlayer } from './ai.js';
+import { AiPlayer, StockfishClient } from './ai.js';
 
 let boardEl;
 let statusText;
@@ -16,6 +16,18 @@ let undoBtn;
 let themeGrid;
 let themeTemplate;
 let clockEls;
+let reviewGameBtn;
+let reviewModal;
+let reviewBackdrop;
+let closeReviewBtn;
+let reviewSummaryEl;
+let reviewProgressEl;
+let reviewListEl;
+let resignBtn;
+let resignModal;
+let resignBackdrop;
+let cancelResignBtn;
+let confirmResignBtn;
 
 // Captured pieces
 let capturedWhiteEl;
@@ -33,6 +45,7 @@ let focusTimeWhite;
 let focusTimeBlack;
 let focusCapturedWhite;
 let focusCapturedBlack;
+let focusPostActions;
 let isFocusMode = false;
 let toastContainer;
 let audioCtx = null;
@@ -62,16 +75,30 @@ const storage = {
     },
 };
 
+const MATCH_SETTINGS_KEY = 'aurumMatchSettings';
+const REVIEW_STORAGE_KEY = 'aurumLastReviewGame';
+
 let unlockCount = 1;
 let timeControl = 'untimed';
+let playerColor = 'random';
+let boardOrientation = 'white';
+let humanColor = 'w';
+let aiColor = 'b';
 let timers = { w: null, b: null };
 let timerInterval = null;
 let lastTick = null;
 let gameOver = false;
 let gameStarted = false;
+let aiMoveToken = 0;
+let gameMoves = [];
+let gameResultText = '';
+let reviewRequestToken = 0;
+let dragSourceSquare = null;
+
+const reviewEngine = new StockfishClient();
 
 const themes = [
-    { id: 0, name: 'Polished Quartz', light: '#f7f8fc', dark: '#cad1e5' },
+    { id: 0, name: 'Tournament Green', light: '#d5d5d8', dark: '#6ea043' },
     { id: 1, name: 'Amberwood', light: '#f8f0df', dark: '#d8b889' },
     { id: 2, name: 'Mint Crest', light: '#e7fff3', dark: '#9de5c2' },
     { id: 3, name: 'Blush Silk', light: '#ffeef5', dark: '#f3a6cd' },
@@ -84,8 +111,18 @@ const themes = [
 ];
 
 const pieceIcons = {
-    wp: '♙', wn: '♘', wb: '♗', wr: '♖', wq: '♕', wk: '♔',
-    bp: '♟', bn: '♞', bb: '♝', br: '♜', bq: '♛', bk: '♚',
+    wp: 'https://upload.wikimedia.org/wikipedia/commons/4/45/Chess_plt45.svg',
+    wn: 'https://upload.wikimedia.org/wikipedia/commons/7/70/Chess_nlt45.svg',
+    wb: 'https://upload.wikimedia.org/wikipedia/commons/b/b1/Chess_blt45.svg',
+    wr: 'https://upload.wikimedia.org/wikipedia/commons/7/72/Chess_rlt45.svg',
+    wq: 'https://upload.wikimedia.org/wikipedia/commons/1/15/Chess_qlt45.svg',
+    wk: 'https://upload.wikimedia.org/wikipedia/commons/4/42/Chess_klt45.svg',
+    bp: 'https://upload.wikimedia.org/wikipedia/commons/c/c7/Chess_pdt45.svg',
+    bn: 'https://upload.wikimedia.org/wikipedia/commons/e/ef/Chess_ndt45.svg',
+    bb: 'https://upload.wikimedia.org/wikipedia/commons/9/98/Chess_bdt45.svg',
+    br: 'https://upload.wikimedia.org/wikipedia/commons/f/ff/Chess_rdt45.svg',
+    bq: 'https://upload.wikimedia.org/wikipedia/commons/4/47/Chess_qdt45.svg',
+    bk: 'https://upload.wikimedia.org/wikipedia/commons/f/f0/Chess_kdt45.svg',
 };
 
 function init() {
@@ -103,6 +140,18 @@ function init() {
     undoBtn = document.getElementById('undoBtn');
     themeGrid = document.getElementById('themeGrid');
     themeTemplate = document.getElementById('themeCardTemplate');
+    reviewGameBtn = document.getElementById('reviewGameBtn');
+    reviewModal = document.getElementById('reviewModal');
+    reviewBackdrop = document.getElementById('reviewBackdrop');
+    closeReviewBtn = document.getElementById('closeReviewBtn');
+    reviewSummaryEl = document.getElementById('reviewSummary');
+    reviewProgressEl = document.getElementById('reviewProgress');
+    reviewListEl = document.getElementById('reviewList');
+    resignBtn = document.getElementById('resignBtn');
+    resignModal = document.getElementById('resignModal');
+    resignBackdrop = document.getElementById('resignBackdrop');
+    cancelResignBtn = document.getElementById('cancelResignBtn');
+    confirmResignBtn = document.getElementById('confirmResignBtn');
     clockEls = {
         w: document.getElementById('timeWhite'),
         b: document.getElementById('timeBlack'),
@@ -123,9 +172,11 @@ function init() {
     focusTimeBlack = document.getElementById('focusTimeBlack');
     focusCapturedWhite = document.getElementById('focusCapturedWhite');
     focusCapturedBlack = document.getElementById('focusCapturedBlack');
+    focusPostActions = document.getElementById('focusPostActions');
     toastContainer = document.getElementById('toastContainer');
 
     unlockCount = loadUnlocks();
+    loadMatchSettings();
 
     buildBoard();
     buildFocusBoard();
@@ -145,6 +196,9 @@ function buildBoard() {
             square.className = `square ${(row + col) % 2 === 0 ? 'light' : 'dark'}`;
             square.dataset.square = engine.coordsToSquare(row, col);
             square.addEventListener('click', () => onSquareClick(square.dataset.square));
+            square.addEventListener('dragover', onSquareDragOver);
+            square.addEventListener('dragleave', onSquareDragLeave);
+            square.addEventListener('drop', onSquareDrop);
             boardEl.appendChild(square);
         }
     }
@@ -159,14 +213,17 @@ function buildFocusBoard() {
             square.className = `square ${(row + col) % 2 === 0 ? 'light' : 'dark'}`;
             square.dataset.square = engine.coordsToSquare(row, col);
             square.addEventListener('click', () => onSquareClick(square.dataset.square));
+            square.addEventListener('dragover', onSquareDragOver);
+            square.addEventListener('dragleave', onSquareDragLeave);
+            square.addEventListener('drop', onSquareDrop);
             focusBoard.appendChild(square);
         }
     }
 }
 
 function bindControls() {
-    modeAIButton.addEventListener('click', () => setMode('ai'));
-    modePvpButton.addEventListener('click', () => setMode('pvp'));
+    if (modeAIButton) modeAIButton.addEventListener('click', () => setMode('ai'));
+    if (modePvpButton) modePvpButton.addEventListener('click', () => setMode('pvp'));
     document.querySelectorAll('#aiControls .seg').forEach(btn => {
         btn.addEventListener('click', () => {
             if (gameStarted) return;
@@ -186,35 +243,57 @@ function bindControls() {
         });
     });
 
-    newGameBtn.addEventListener('click', startNewGame);
-    document.getElementById('focusModeBtn').addEventListener('click', () => toggleFocusMode(true));
-    document.getElementById('exitFocusBtn').addEventListener('click', () => toggleFocusMode(false));
-    document.getElementById('focusUndoBtn').addEventListener('click', () => {
+    if (newGameBtn) newGameBtn.addEventListener('click', startNewGame);
+    if (reviewGameBtn) {
+        reviewGameBtn.addEventListener('click', () => {
+            if (!gameMoves.length) return;
+            persistReviewSnapshot();
+            window.location.href = 'review.html';
+        });
+    }
+    if (reviewBackdrop) reviewBackdrop.addEventListener('click', closeReviewModal);
+    if (closeReviewBtn) closeReviewBtn.addEventListener('click', closeReviewModal);
+
+    if (resignBtn) resignBtn.addEventListener('click', showResignConfirm);
+    if (resignBackdrop) resignBackdrop.addEventListener('click', closeResignModal);
+    if (cancelResignBtn) cancelResignBtn.addEventListener('click', closeResignModal);
+    if (confirmResignBtn) confirmResignBtn.addEventListener('click', confirmResignMatch);
+
+    const exitFocusBtn = document.getElementById('exitFocusBtn');
+    if (exitFocusBtn) exitFocusBtn.addEventListener('click', () => toggleFocusMode(false));
+    const focusUndoBtn = document.getElementById('focusUndoBtn');
+    if (focusUndoBtn) focusUndoBtn.addEventListener('click', () => {
         if (engine.history.length === 0 || gameOver) return;
+        aiMoveToken += 1;
         engine.undo();
-        if (mode === 'ai' && engine.turn === 'b' && engine.history.length) {
+        if (mode === 'ai' && engine.turn === aiColor && engine.history.length) {
             engine.undo();
         }
+        trimMoveHistoryToEngine();
         rebuildCapturedFromHistory();
         refreshBoard();
         updateStatus();
+        updateReviewButtonState();
     });
-    resetProgressBtn.addEventListener('click', () => {
+    if (resetProgressBtn) resetProgressBtn.addEventListener('click', () => {
         unlockCount = 1;
         saveUnlocks();
         renderThemes();
         refreshUnlockDisplay();
     });
-    undoBtn.addEventListener('click', () => {
+    if (undoBtn) undoBtn.addEventListener('click', () => {
         if (engine.history.length === 0 || gameOver) return;
+        aiMoveToken += 1;
         engine.undo();
         // If undoing after AI moved, undo twice to revert to player turn
-        if (mode === 'ai' && engine.turn === 'b' && engine.history.length) {
+        if (mode === 'ai' && engine.turn === aiColor && engine.history.length) {
             engine.undo();
         }
+        trimMoveHistoryToEngine();
         rebuildCapturedFromHistory();
         refreshBoard();
         updateStatus();
+        updateReviewButtonState();
     });
 }
 
@@ -222,9 +301,9 @@ function setMode(nextMode) {
     if (gameStarted) return;
     if (mode === nextMode) return;
     mode = nextMode;
-    modeAIButton.classList.toggle('active', nextMode === 'ai');
-    modePvpButton.classList.toggle('active', nextMode === 'pvp');
-    aiControls.style.display = nextMode === 'ai' ? 'block' : 'none';
+    if (modeAIButton) modeAIButton.classList.toggle('active', nextMode === 'ai');
+    if (modePvpButton) modePvpButton.classList.toggle('active', nextMode === 'pvp');
+    if (aiControls) aiControls.style.display = nextMode === 'ai' ? 'block' : 'none';
     startNewGame();
 }
 
@@ -269,23 +348,57 @@ function selectTheme(id) {
 }
 
 function startNewGame() {
+    aiMoveToken += 1;
+    reviewRequestToken += 1;
     engine.reset();
+    assignSidesForNewGame();
     lastMoveSquares = [];
     selectedSquare = null;
     legalMovesCache = [];
     gameOver = false;
     gameStarted = false;
+    gameMoves = [];
+    gameResultText = '';
     capturedPieces = { w: [], b: [] };
     if (moveListEl) moveListEl.innerHTML = '';
     if (focusMoveList) focusMoveList.innerHTML = '';
+    closeReviewModal();
+    closeResignModal();
+    setPostMatchActionsVisible(false);
     renderCaptured();
     resetTimers();
     refreshBoard();
     setControlsLocked(false);
+    toggleFocusMode(true);
     updateStatus('New game ready');
-    if (mode === 'ai' && engine.turn === 'b') {
+    updateReviewButtonState();
+    if (mode === 'ai' && engine.turn === aiColor) {
         makeAIMove();
     }
+}
+
+function assignSidesForNewGame() {
+    if (mode !== 'ai') {
+        humanColor = 'w';
+        aiColor = 'b';
+        return;
+    }
+
+    if (playerColor === 'white') {
+        humanColor = 'w';
+        aiColor = 'b';
+        return;
+    }
+
+    if (playerColor === 'black') {
+        humanColor = 'b';
+        aiColor = 'w';
+        return;
+    }
+
+    // Random side assignment in AI mode.
+    humanColor = Math.random() < 0.5 ? 'w' : 'b';
+    aiColor = humanColor === 'w' ? 'b' : 'w';
 }
 
 function refreshBoard() {
@@ -305,10 +418,14 @@ function refreshBoard() {
 
             if (piece) {
                 const icon = pieceIcons[`${piece.color}${piece.type}`];
-                const span = document.createElement('span');
-                span.className = `piece piece-${piece.color}`;
-                span.textContent = icon;
-                square.appendChild(span);
+                const img = document.createElement('img');
+                img.className = `piece piece-${piece.color}`;
+                img.src = icon;
+                img.alt = `${piece.color === 'w' ? 'White' : 'Black'} ${piece.type}`;
+                img.draggable = true;
+                img.addEventListener('dragstart', onPieceDragStart);
+                img.addEventListener('dragend', onPieceDragEnd);
+                square.appendChild(img);
             }
 
             if (lastMoveSquares.includes(algebraic)) {
@@ -327,9 +444,14 @@ function refreshBoard() {
     renderCaptured();
 }
 
+function canPlayerActOnTurn() {
+    if (gameOver) return false;
+    if (mode !== 'ai') return true;
+    return engine.turn === humanColor;
+}
+
 function onSquareClick(square) {
-    if (gameOver) return;
-    if (mode === 'ai' && engine.turn === 'b') return; // AI thinking
+    if (!canPlayerActOnTurn()) return;
 
     const { row, col } = engine.squareToCoords(square);
     const piece = engine.getPiece(row, col);
@@ -356,6 +478,98 @@ function onSquareClick(square) {
     }
 }
 
+function onPieceDragStart(event) {
+    if (!canPlayerActOnTurn()) {
+        event.preventDefault();
+        return;
+    }
+
+    const squareEl = event.target && event.target.parentElement;
+    const fromSquare = squareEl && squareEl.dataset ? squareEl.dataset.square : null;
+    if (!fromSquare) {
+        event.preventDefault();
+        return;
+    }
+
+    const { row, col } = engine.squareToCoords(fromSquare);
+    const piece = engine.getPiece(row, col);
+    if (!piece || piece.color !== engine.turn) {
+        event.preventDefault();
+        return;
+    }
+
+    dragSourceSquare = fromSquare;
+    selectedSquare = fromSquare;
+    showHighlights(fromSquare);
+
+    if (event.dataTransfer) {
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', fromSquare);
+    }
+}
+
+function onPieceDragEnd() {
+    dragSourceSquare = null;
+    clearDragOverStates();
+}
+
+function onSquareDragOver(event) {
+    if (!dragSourceSquare || !canPlayerActOnTurn()) return;
+    event.preventDefault();
+
+    const targetSquare = event.currentTarget && event.currentTarget.dataset
+        ? event.currentTarget.dataset.square
+        : null;
+    if (!targetSquare) return;
+
+    const hasLegalMove = legalMovesCache.some(
+        m => engine.coordsToSquare(m.from.row, m.from.col) === dragSourceSquare
+            && engine.coordsToSquare(m.to.row, m.to.col) === targetSquare
+    );
+
+    if (hasLegalMove) {
+        event.currentTarget.classList.add('drag-over');
+    }
+}
+
+function onSquareDragLeave(event) {
+    if (!event.currentTarget) return;
+    event.currentTarget.classList.remove('drag-over');
+}
+
+function onSquareDrop(event) {
+    if (!dragSourceSquare || !canPlayerActOnTurn()) return;
+    event.preventDefault();
+
+    const targetSquare = event.currentTarget && event.currentTarget.dataset
+        ? event.currentTarget.dataset.square
+        : null;
+    const fromSquare = dragSourceSquare;
+    dragSourceSquare = null;
+    clearDragOverStates();
+
+    if (!targetSquare) return;
+
+    const move = legalMovesCache.find(
+        m => engine.coordsToSquare(m.from.row, m.from.col) === fromSquare
+            && engine.coordsToSquare(m.to.row, m.to.col) === targetSquare
+    );
+
+    if (move) {
+        makePlayerMove(move);
+    } else {
+        clearHighlights();
+        selectedSquare = null;
+    }
+}
+
+function clearDragOverStates() {
+    const boards = [boardEl, focusBoard].filter(Boolean);
+    boards.forEach(bEl => {
+        bEl.querySelectorAll('.square').forEach(sq => sq.classList.remove('drag-over'));
+    });
+}
+
 function showHighlights(square) {
     clearHighlights();
     const moves = legalMovesCache.filter(m => engine.coordsToSquare(m.from.row, m.from.col) === square);
@@ -379,7 +593,7 @@ function showHighlights(square) {
 function clearHighlights() {
     const boards = [boardEl, focusBoard].filter(Boolean);
     boards.forEach(bEl => {
-        bEl.querySelectorAll('.square').forEach(sq => sq.classList.remove('selected', 'highlight-move', 'capture'));
+        bEl.querySelectorAll('.square').forEach(sq => sq.classList.remove('selected', 'highlight-move', 'capture', 'drag-over'));
     });
 }
 
@@ -387,32 +601,47 @@ function makePlayerMove(move) {
     clearHighlights();
     applyMoveAndUpdate(move, 'player');
     if (gameOver) return;
-    if (mode === 'ai' && engine.turn === 'b') {
+    if (mode === 'ai' && engine.turn === aiColor) {
         setTimeout(makeAIMove, 250);
     }
 }
 
 function makeAIMove() {
     if (gameOver) return;
+    if (mode !== 'ai' || engine.turn !== aiColor) return;
+
     const legalMoves = engine.generateLegalMoves(engine.turn);
     if (!legalMoves.length) {
         updateStatus('AI has no moves');
         return;
     }
 
+    const token = ++aiMoveToken;
     const thinkMs = getAiDelay(ai.difficulty || 'easy', legalMoves.length);
-    setTimeout(() => {
-        if (gameOver) return;
-        const move = ai.chooseMove(engine);
-        if (!move) {
-            updateStatus('AI has no moves');
-            return;
-        }
-        applyMoveAndUpdate(move, 'ai');
-    }, thinkMs);
+    updateStatus('AI thinking...');
+
+    ai.chooseMove(engine, { thinkTimeMs: thinkMs })
+        .then(move => {
+            if (gameOver || token !== aiMoveToken) return;
+            if (!move) {
+                updateStatus('AI has no moves');
+                return;
+            }
+            applyMoveAndUpdate(move, 'ai');
+        })
+        .catch(err => {
+            if (token !== aiMoveToken) return;
+            console.error('AI move failed', err);
+            updateStatus('AI failed to move');
+            showToast('AI move failed. Try starting a new game.', 'danger');
+        });
 }
 
 function applyMoveAndUpdate(move, actor) {
+    const moverColor = engine.turn;
+    const preFen = engine.getFen();
+    const moveNumber = engine.fullmoveNumber;
+
     // Track captured piece before applying
     const capturedPiece = engine.getPiece(move.to.row, move.to.col);
     let epCaptured = null;
@@ -423,10 +652,12 @@ function applyMoveAndUpdate(move, actor) {
     const taken = capturedPiece || epCaptured;
 
     engine.applyMove(move);
+    const postFen = engine.getFen();
 
     if (!gameStarted) {
         gameStarted = true;
         setControlsLocked(true);
+        updateResignButtonState();
     }
 
     if (taken) {
@@ -436,9 +667,21 @@ function applyMoveAndUpdate(move, actor) {
     }
 
     lastMoveSquares = [engine.coordsToSquare(move.from.row, move.from.col), engine.coordsToSquare(move.to.row, move.to.col)];
+    gameMoves.push({
+        move,
+        actor,
+        moverColor,
+        moveNumber,
+        preFen,
+        postFen,
+        notation: formatMoveNotation(move, actor),
+        uci: toUciMove(move),
+    });
+    persistReviewSnapshot();
     pushMoveToList(move, actor);
     refreshBoard();
     updateStatus();
+
     switchTimer();
 
     // audio feedback
@@ -472,6 +715,9 @@ function updateStatus(manualText) {
             renderThemes();
             refreshUnlockDisplay();
         }
+        gameResultText = msg;
+        persistReviewSnapshot();
+        updateReviewButtonState();
         return;
     }
 
@@ -481,6 +727,9 @@ function updateStatus(manualText) {
         stopTimer();
         showToast('Draw by stalemate', 'info');
         playSound('gameover');
+        gameResultText = 'Draw by stalemate';
+        persistReviewSnapshot();
+        updateReviewButtonState();
         return;
     }
 
@@ -498,13 +747,7 @@ function updateStatus(manualText) {
 
 function pushMoveToList(move, actor) {
     const li = document.createElement('li');
-    const from = engine.coordsToSquare(move.from.row, move.from.col);
-    const to = engine.coordsToSquare(move.to.row, move.to.col);
-    let notation = `${from} → ${to}`;
-    if (move.castle === 'king') notation = 'O-O';
-    if (move.castle === 'queen') notation = 'O-O-O';
-    if (move.promotion) notation += ' = Q';
-    if (actor === 'ai') notation += ' (AI)';
+    const notation = formatMoveNotation(move, actor);
     li.textContent = notation;
 
     [moveListEl, focusMoveList].forEach(el => {
@@ -553,6 +796,61 @@ function loadUnlocks() {
     return Math.min(Math.max(Number.isFinite(parsed) ? parsed : 1, 1), 10);
 }
 
+function loadMatchSettings() {
+    const raw = storage.get(MATCH_SETTINGS_KEY);
+    if (!raw) return;
+
+    try {
+        const parsed = JSON.parse(raw);
+        const nextMode = parsed && parsed.mode === 'pvp' ? 'pvp' : 'ai';
+        const nextDifficulty = parsed && ['easy', 'medium', 'hard', 'grandmaster'].includes(parsed.difficulty) ? parsed.difficulty : 'easy';
+        const nextTime = parsed && ['untimed', '180', '600'].includes(String(parsed.timeControl)) ? String(parsed.timeControl) : 'untimed';
+        const nextPlayerColor = parsed && ['white', 'black', 'random'].includes(parsed.playerColor) ? parsed.playerColor : 'random';
+        const requestedTheme = Number(parsed && parsed.theme);
+
+        mode = nextMode;
+        timeControl = nextTime;
+        playerColor = nextPlayerColor;
+        ai.setDifficulty(nextDifficulty);
+
+        // Keep White always at the bottom in all modes.
+        boardOrientation = 'white';
+        applyBoardOrientation();
+
+        if (modeAIButton) modeAIButton.classList.toggle('active', mode === 'ai');
+        if (modePvpButton) modePvpButton.classList.toggle('active', mode === 'pvp');
+        if (aiControls) aiControls.style.display = mode === 'ai' ? 'block' : 'none';
+
+        document.querySelectorAll('#aiControls .seg').forEach(btn => {
+            const isActive = btn.dataset.difficulty === nextDifficulty;
+            btn.classList.toggle('active', isActive);
+        });
+
+        timeButtons.forEach(btn => {
+            const isActive = btn.dataset.time === timeControl;
+            btn.classList.toggle('active', isActive);
+        });
+
+        if (Number.isFinite(requestedTheme) && requestedTheme >= 0 && requestedTheme < themes.length && requestedTheme + 1 <= unlockCount) {
+            activeTheme = requestedTheme;
+        } else {
+            activeTheme = 0;
+        }
+    } catch (_) {
+        // ignore malformed saved settings
+    }
+}
+
+function applyBoardOrientation() {
+    const isBlackView = boardOrientation === 'black';
+    if (boardEl) {
+        boardEl.classList.toggle('flipped', isBlackView);
+    }
+    if (focusBoard) {
+        focusBoard.classList.toggle('flipped', isBlackView);
+    }
+}
+
 function resetTimers() {
     stopTimer();
     timers = { w: timeControl === 'untimed' ? null : Number(timeControl), b: timeControl === 'untimed' ? null : Number(timeControl) };
@@ -595,6 +893,9 @@ function handleFlagFall(color) {
     [statusText, focusStatusText].forEach(el => { if (el) el.textContent = msg; });
     showToast(msg, 'warn');
     playSound('gameover');
+    gameResultText = msg;
+    persistReviewSnapshot();
+    updateReviewButtonState();
 }
 
 function stopTimer() {
@@ -602,6 +903,61 @@ function stopTimer() {
         clearInterval(timerInterval);
         timerInterval = null;
     }
+}
+
+function showResignConfirm() {
+    if (gameOver || !gameStarted) return;
+    if (resignModal) {
+        resignModal.setAttribute('aria-hidden', 'false');
+        resignModal.style.display = 'flex';
+    }
+}
+
+function closeResignModal() {
+    if (resignModal) {
+        resignModal.setAttribute('aria-hidden', 'true');
+        resignModal.style.display = 'none';
+    }
+}
+
+function confirmResignMatch() {
+    closeResignModal();
+    gameOver = true;
+    stopTimer();
+    const lossText = engine.turn === 'w' ? 'Black' : 'White';
+    const msg = `${lossText} wins by resignation`;
+    [statusText, focusStatusText].forEach(el => { if (el) el.textContent = msg; });
+    showToast('Match resigned', 'warn');
+    playSound('gameover');
+    gameResultText = msg;
+    persistReviewSnapshot();
+    updateReviewButtonState();
+}
+
+function persistReviewSnapshot() {
+    if (!gameMoves.length) return;
+
+    const payload = {
+        savedAt: Date.now(),
+        result: gameResultText || '',
+        mode,
+        difficulty: ai.difficulty || 'easy',
+        timeControl,
+        theme: activeTheme,
+        humanColor,
+        aiColor,
+        moves: gameMoves.map(item => ({
+            actor: item.actor,
+            moverColor: item.moverColor,
+            moveNumber: item.moveNumber,
+            preFen: item.preFen,
+            postFen: item.postFen,
+            notation: item.notation,
+            uci: item.uci,
+        })),
+    };
+
+    storage.set(REVIEW_STORAGE_KEY, JSON.stringify(payload));
 }
 
 function updateClockDisplays() {
@@ -631,12 +987,18 @@ function getAiDelay(difficulty, legalCount) {
         easy: [300, 900],      // casual
         medium: [550, 1300],   // balanced
         hard: [900, 2200],     // deeper search
+        grandmaster: [2500, 5500], // strongest practical browser profile
     };
     const [min, max] = ranges[difficulty] || ranges.medium;
     const base = min + Math.random() * (max - min);
 
     // Add a small complexity bump so busier positions take longer
-    const bump = complexities * (difficulty === 'hard' ? 600 : difficulty === 'medium' ? 400 : 250);
+    const bump = complexities * (
+        difficulty === 'grandmaster' ? 1400
+            : difficulty === 'hard' ? 600
+                : difficulty === 'medium' ? 400
+                    : 250
+    );
     return Math.floor(base + bump);
 }
 
@@ -706,10 +1068,13 @@ function renderCaptured() {
         if (!el) return;
         el.innerHTML = '';
         [...list].sort(sortFn).forEach(p => {
-            const span = document.createElement('span');
-            span.className = `piece-${p.color}`;
-            span.textContent = pieceIcons[`${p.color}${p.type}`];
-            el.appendChild(span);
+            const img = document.createElement('img');
+            img.className = `captured-piece piece-${p.color}`;
+            img.src = pieceIcons[`${p.color}${p.type}`];
+            img.alt = `${p.color === 'w' ? 'White' : 'Black'} ${p.type}`;
+            img.loading = 'lazy';
+            img.decoding = 'async';
+            el.appendChild(img);
         });
     };
 
@@ -731,21 +1096,357 @@ function rebuildCapturedFromHistory() {
     renderCaptured();
 }
 
+function trimMoveHistoryToEngine() {
+    if (gameMoves.length > engine.history.length) {
+        gameMoves.length = engine.history.length;
+    }
+    gameOver = false;
+    gameResultText = '';
+    reviewRequestToken += 1;
+    closeReviewModal();
+}
+
+function updateReviewButtonState() {
+    if (!reviewGameBtn) return;
+    reviewGameBtn.disabled = !gameOver || gameMoves.length === 0;
+    setPostMatchActionsVisible(gameOver && gameMoves.length > 0);
+    updateResignButtonState();
+}
+
+function updateResignButtonState() {
+    if (!resignBtn) return;
+    resignBtn.disabled = gameOver || !gameStarted;
+}
+
+function setPostMatchActionsVisible(visible) {
+    if (!focusPostActions) return;
+    focusPostActions.classList.toggle('visible', !!visible);
+}
+
+function openReviewModal() {
+    if (!reviewModal) return;
+    reviewModal.classList.add('active');
+    reviewModal.setAttribute('aria-hidden', 'false');
+}
+
+function closeReviewModal() {
+    if (!reviewModal) return;
+    reviewModal.classList.remove('active');
+    reviewModal.setAttribute('aria-hidden', 'true');
+}
+
+function launchGameReview(autoOpen) {
+    if (!gameOver || !gameMoves.length) return;
+
+    const token = ++reviewRequestToken;
+    if (autoOpen) {
+        openReviewModal();
+    }
+
+    if (reviewSummaryEl) {
+        reviewSummaryEl.textContent = gameResultText || 'Game complete';
+    }
+    if (reviewProgressEl) {
+        reviewProgressEl.textContent = 'Analyzing moves with Stockfish...';
+    }
+    if (reviewListEl) {
+        reviewListEl.innerHTML = '';
+    }
+
+    analyzeCompletedGame(gameMoves.slice(), token)
+        .then(report => {
+            if (token !== reviewRequestToken) return;
+            renderReviewReport(report);
+        })
+        .catch(err => {
+            if (token !== reviewRequestToken) return;
+            console.error('Review failed', err);
+            runFallbackReview(gameMoves.slice(), token, err);
+        });
+}
+
+async function analyzeCompletedGame(moves, token) {
+    try {
+        return await analyzeCompletedGameWithStockfish(moves, token);
+    } catch (error) {
+        console.warn('Stockfish review unavailable; using fallback reviewer.', error);
+        return analyzeCompletedGameFallback(moves, token);
+    }
+}
+
+async function analyzeCompletedGameWithStockfish(moves, token) {
+    const report = [];
+    let whiteCplTotal = 0;
+    let blackCplTotal = 0;
+    let whiteCount = 0;
+    let blackCount = 0;
+
+    for (let i = 0; i < moves.length; i++) {
+        if (token !== reviewRequestToken) {
+            throw new Error('Review cancelled');
+        }
+        const item = moves[i];
+        if (reviewProgressEl) {
+            reviewProgressEl.textContent = `Analyzing move ${i + 1} / ${moves.length}...`;
+        }
+
+        const pre = await reviewEngine.analyzePosition(item.preFen, { moveTimeMs: 180, skillLevel: 20 });
+        const post = await reviewEngine.analyzePosition(item.postFen, { moveTimeMs: 180, skillLevel: 20 });
+
+        const bestScore = Number(pre.scoreCp) || 0;
+        const playedScore = -((Number(post.scoreCp) || 0));
+        const cpLossRaw = bestScore - playedScore;
+        const cpLoss = Math.max(0, Math.min(2000, Math.round(cpLossRaw)));
+        const bestUci = pre.bestMove || '';
+        const isBest = bestUci && bestUci === item.uci;
+        const verdict = classifyMove(cpLoss, isBest);
+
+        if (item.moverColor === 'w') {
+            whiteCplTotal += cpLoss;
+            whiteCount += 1;
+        } else {
+            blackCplTotal += cpLoss;
+            blackCount += 1;
+        }
+
+        report.push({
+            ply: i + 1,
+            moveNumber: item.moveNumber,
+            moverColor: item.moverColor,
+            notation: item.notation,
+            playedUci: item.uci,
+            bestUci,
+            cpLoss,
+            verdict,
+            bestScore,
+            playedScore,
+        });
+    }
+
+    return {
+        rows: report,
+        avgCplWhite: whiteCount ? Math.round(whiteCplTotal / whiteCount) : 0,
+        avgCplBlack: blackCount ? Math.round(blackCplTotal / blackCount) : 0,
+        movesAnalyzed: report.length,
+        engineSource: 'Stockfish',
+    };
+}
+
+function analyzeCompletedGameFallback(moves, token) {
+    const sim = new ChessEngine();
+    const report = [];
+    let whiteCplTotal = 0;
+    let blackCplTotal = 0;
+    let whiteCount = 0;
+    let blackCount = 0;
+
+    for (let i = 0; i < moves.length; i++) {
+        if (token !== reviewRequestToken) {
+            throw new Error('Review cancelled');
+        }
+
+        const item = moves[i];
+        if (reviewProgressEl) {
+            reviewProgressEl.textContent = `Fallback analysis ${i + 1} / ${moves.length}...`;
+        }
+
+        const legal = sim.generateLegalMoves(sim.turn);
+        if (!legal.length) break;
+
+        const playedMove = legal.find(m => toUciMoveFromEngineMove(sim, m) === item.uci) || legal[0];
+        const bestMove = ai.pickShallow(sim, legal, sim.turn, 2) || legal[0];
+
+        const moverColor = sim.turn;
+        const bestScore = evaluateMoveScore(sim, bestMove, moverColor);
+        const playedScore = evaluateMoveScore(sim, playedMove, moverColor);
+        const cpLoss = Math.max(0, Math.min(2000, Math.round(bestScore - playedScore)));
+
+        const bestUci = toUciMoveFromEngineMove(sim, bestMove);
+        const playedUci = toUciMoveFromEngineMove(sim, playedMove);
+        const isBest = bestUci === playedUci;
+        const verdict = classifyMove(cpLoss, isBest);
+
+        if (moverColor === 'w') {
+            whiteCplTotal += cpLoss;
+            whiteCount += 1;
+        } else {
+            blackCplTotal += cpLoss;
+            blackCount += 1;
+        }
+
+        report.push({
+            ply: i + 1,
+            moveNumber: item.moveNumber,
+            moverColor,
+            notation: item.notation,
+            playedUci,
+            bestUci,
+            cpLoss,
+            verdict,
+            bestScore,
+            playedScore,
+        });
+
+        sim.applyMove(playedMove);
+    }
+
+    return {
+        rows: report,
+        avgCplWhite: whiteCount ? Math.round(whiteCplTotal / whiteCount) : 0,
+        avgCplBlack: blackCount ? Math.round(blackCplTotal / blackCount) : 0,
+        movesAnalyzed: report.length,
+        engineSource: 'Fallback',
+    };
+}
+
+function evaluateMoveScore(simEngine, move, perspective) {
+    simEngine.applyMove(move);
+    const score = ai.evaluateBoard(simEngine, perspective);
+    simEngine.undo();
+    return score;
+}
+
+function toUciMoveFromEngineMove(simEngine, move) {
+    const from = simEngine.coordsToSquare(move.from.row, move.from.col);
+    const to = simEngine.coordsToSquare(move.to.row, move.to.col);
+    const promo = move.promotion ? String(move.promotion).toLowerCase() : '';
+    return `${from}${to}${promo}`;
+}
+
+function runFallbackReview(moves, token, rootError) {
+    try {
+        const fallbackReport = analyzeCompletedGameFallback(moves, token);
+        if (token !== reviewRequestToken) return;
+        renderReviewReport(fallbackReport);
+        showToast('Stockfish unavailable: showing fallback review.', 'warn');
+    } catch (fallbackError) {
+        console.error('Fallback review failed', rootError, fallbackError);
+        if (reviewProgressEl) {
+            reviewProgressEl.textContent = 'Review failed to run. Please try a new match and review again.';
+        }
+    }
+}
+
+function classifyMove(cpLoss, isBest) {
+    if (isBest || cpLoss <= 15) {
+        return { key: 'best', icon: '★', label: 'Best Move' };
+    }
+    if (cpLoss <= 35) {
+        return { key: 'excellent', icon: '!!', label: 'Excellent' };
+    }
+    if (cpLoss <= 80) {
+        return { key: 'good', icon: '!', label: 'Good' };
+    }
+    if (cpLoss <= 150) {
+        return { key: 'inaccuracy', icon: '?!', label: 'Inaccuracy' };
+    }
+    if (cpLoss <= 300) {
+        return { key: 'mistake', icon: '?', label: 'Mistake' };
+    }
+    return { key: 'blunder', icon: '??', label: 'Blunder' };
+}
+
+function renderReviewReport(report) {
+    if (!reviewListEl || !reviewProgressEl || !reviewSummaryEl) return;
+
+    const headerBits = [];
+    if (gameResultText) headerBits.push(gameResultText);
+    if (report.engineSource) headerBits.push(`Engine: ${report.engineSource}`);
+    headerBits.push(`Moves analyzed: ${report.movesAnalyzed}`);
+    headerBits.push(`Avg CPL White: ${report.avgCplWhite}`);
+    headerBits.push(`Avg CPL Black: ${report.avgCplBlack}`);
+    reviewSummaryEl.textContent = headerBits.join(' | ');
+
+    reviewListEl.innerHTML = '';
+    report.rows.forEach(row => {
+        const li = document.createElement('li');
+        li.className = `review-item ${row.verdict.key}`;
+
+        const top = document.createElement('div');
+        top.className = 'review-item-top';
+
+        const moveLabel = document.createElement('span');
+        const side = row.moverColor === 'w' ? 'White' : 'Black';
+        moveLabel.className = 'review-move';
+        moveLabel.textContent = `${row.moveNumber}${row.moverColor === 'w' ? '.' : '...'} ${row.notation} (${side})`;
+
+        const badge = document.createElement('span');
+        badge.className = `review-badge ${row.verdict.key}`;
+        badge.textContent = `${row.verdict.icon} ${row.verdict.label}`;
+
+        top.appendChild(moveLabel);
+        top.appendChild(badge);
+        li.appendChild(top);
+
+        const detail = document.createElement('p');
+        detail.className = 'review-detail';
+        detail.textContent = `CPL ${row.cpLoss} | Eval ${formatEvalCp(row.playedScore)} (best ${formatEvalCp(row.bestScore)})`;
+        li.appendChild(detail);
+
+        if (row.bestUci && row.bestUci !== row.playedUci) {
+            const hint = document.createElement('p');
+            hint.className = 'review-best-hint';
+            hint.textContent = `Best move: ${formatUciMove(row.bestUci)} | Played: ${formatUciMove(row.playedUci)}`;
+            li.appendChild(hint);
+        }
+
+        reviewListEl.appendChild(li);
+    });
+
+    reviewProgressEl.textContent = 'Analysis complete.';
+}
+
+function formatEvalCp(cp) {
+    const value = Number(cp) || 0;
+    const pawns = value / 100;
+    const sign = pawns > 0 ? '+' : '';
+    return `${sign}${pawns.toFixed(2)}`;
+}
+
+function toUciMove(move) {
+    const from = engine.coordsToSquare(move.from.row, move.from.col);
+    const to = engine.coordsToSquare(move.to.row, move.to.col);
+    const promo = move.promotion ? String(move.promotion).toLowerCase() : '';
+    return `${from}${to}${promo}`;
+}
+
+function formatUciMove(uci) {
+    if (!uci || uci.length < 4) return 'n/a';
+    const from = uci.slice(0, 2);
+    const to = uci.slice(2, 4);
+    const promo = uci[4] ? `=${uci[4].toUpperCase()}` : '';
+    return `${from} → ${to}${promo}`;
+}
+
+function formatMoveNotation(move, actor) {
+    const from = engine.coordsToSquare(move.from.row, move.from.col);
+    const to = engine.coordsToSquare(move.to.row, move.to.col);
+    let notation = `${from} → ${to}`;
+    if (move.castle === 'king') notation = 'O-O';
+    if (move.castle === 'queen') notation = 'O-O-O';
+    if (move.promotion) notation += ' = Q';
+    if (actor === 'ai') notation += ' (AI)';
+    return notation;
+}
+
 /* ── Focus Mode ── */
 
 function toggleFocusMode(on) {
+    if (!on) {
+        window.location.href = 'index.html';
+        return;
+    }
+
     isFocusMode = on;
     document.body.classList.toggle('focus-active', on);
     if (focusLayout) focusLayout.classList.toggle('active', on);
 
-    if (on) {
-        // Sync focus board theme
-        if (focusBoardShell) {
-            focusBoardShell.className = `board-shell theme-${activeTheme}`;
-        }
-        refreshBoard();
-        updateClockDisplays();
+    // Sync focus board theme
+    if (focusBoardShell) {
+        focusBoardShell.className = `board-shell theme-${activeTheme}`;
     }
+    refreshBoard();
+    updateClockDisplays();
 }
 
 window.addEventListener('DOMContentLoaded', () => {
