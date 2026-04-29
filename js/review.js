@@ -60,6 +60,7 @@ let reviewData = null;
 let moves = [];
 let currentPly = 0;
 let autoplayTimer = null;
+let resizeRaf = 0;
 
 function init() {
     boardEl = document.getElementById('reviewBoard');
@@ -81,6 +82,8 @@ function init() {
     bindControls();
     loadReviewData();
     renderAll();
+    scheduleBoardResize();
+    window.addEventListener('resize', scheduleBoardResize);
 }
 
 function bindControls() {
@@ -129,6 +132,42 @@ function loadReviewData() {
         moves = [];
         currentPly = 0;
     }
+}
+
+function scheduleBoardResize() {
+    if (resizeRaf) {
+        cancelAnimationFrame(resizeRaf);
+    }
+    resizeRaf = requestAnimationFrame(() => {
+        resizeRaf = 0;
+        syncReviewBoardSize();
+    });
+}
+
+function syncReviewBoardSize() {
+    if (!boardShellEl) return;
+    const area = boardShellEl.parentElement;
+    if (!area) return;
+
+    const areaStyle = getComputedStyle(area);
+    const paddingX = parseFloat(areaStyle.paddingLeft) + parseFloat(areaStyle.paddingRight);
+    const paddingY = parseFloat(areaStyle.paddingTop) + parseFloat(areaStyle.paddingBottom);
+    const rowGap = parseFloat(areaStyle.rowGap) || parseFloat(areaStyle.gap) || 0;
+    const areaWidth = area.clientWidth - paddingX;
+    const areaHeight = area.clientHeight - paddingY;
+
+    const children = Array.from(area.children);
+    const visibleChildren = children.filter(child => child.offsetParent !== null);
+    const usedHeight = visibleChildren
+        .filter(child => child !== boardShellEl)
+        .reduce((sum, child) => sum + child.offsetHeight, 0);
+    const gapCount = Math.max(0, visibleChildren.length - 1);
+    const availableHeight = areaHeight - usedHeight - rowGap * gapCount;
+    const size = Math.max(0, Math.min(areaWidth, availableHeight));
+
+    if (!Number.isFinite(size) || size <= 0) return;
+    boardShellEl.style.width = `${size}px`;
+    boardShellEl.style.height = `${size}px`;
 }
 
 function buildBoard() {
@@ -189,6 +228,7 @@ function renderMoveList() {
     if (!moves.length) {
         reviewEmptyEl.style.display = 'block';
         controlsWrapEl.style.display = 'none';
+        scheduleBoardResize();
         return;
     }
 
@@ -206,6 +246,8 @@ function renderMoveList() {
         li.addEventListener('click', () => jumpToPly(index + 1));
         reviewMoveListEl.appendChild(li);
     });
+
+    scheduleBoardResize();
 }
 
 function jumpToPly(nextPly) {
