@@ -50,6 +50,11 @@ let isFocusMode = false;
 let toastContainer;
 let audioCtx = null;
 let lastInCheck = false;
+let boardSquares = [];
+let focusBoardSquares = [];
+const supportsFinePointer = typeof window !== 'undefined' && window.matchMedia
+    ? window.matchMedia('(pointer: fine)').matches
+    : true;
 
 let engine = new ChessEngine();
 let ai = new AiPlayer('easy');
@@ -190,6 +195,7 @@ function init() {
 function buildBoard() {
     if (!boardEl) return;
     boardEl.innerHTML = '';
+    boardSquares = [];
     for (let row = 0; row < 8; row++) {
         for (let col = 0; col < 8; col++) {
             const square = document.createElement('button');
@@ -200,6 +206,7 @@ function buildBoard() {
             square.addEventListener('dragleave', onSquareDragLeave);
             square.addEventListener('drop', onSquareDrop);
             boardEl.appendChild(square);
+            boardSquares.push(square);
         }
     }
 }
@@ -207,6 +214,7 @@ function buildBoard() {
 function buildFocusBoard() {
     if (!focusBoard) return;
     focusBoard.innerHTML = '';
+    focusBoardSquares = [];
     for (let row = 0; row < 8; row++) {
         for (let col = 0; col < 8; col++) {
             const square = document.createElement('button');
@@ -217,6 +225,7 @@ function buildFocusBoard() {
             square.addEventListener('dragleave', onSquareDragLeave);
             square.addEventListener('drop', onSquareDrop);
             focusBoard.appendChild(square);
+            focusBoardSquares.push(square);
         }
     }
 }
@@ -407,9 +416,9 @@ function refreshBoard() {
     legalMovesCache = legalMoves;
 
     // render both boards (normal + focus)
-    const boards = [boardEl, focusBoard].filter(Boolean);
-    boards.forEach(bEl => {
-        bEl.querySelectorAll('.square').forEach(square => {
+    const boards = [boardSquares, focusBoardSquares].filter(set => set.length);
+    boards.forEach(squares => {
+        squares.forEach(square => {
             const algebraic = square.dataset.square;
             const { row, col } = engine.squareToCoords(algebraic);
             const piece = snapshot[row][col];
@@ -422,9 +431,11 @@ function refreshBoard() {
                 img.className = `piece piece-${piece.color}`;
                 img.src = icon;
                 img.alt = `${piece.color === 'w' ? 'White' : 'Black'} ${piece.type}`;
-                img.draggable = true;
-                img.addEventListener('dragstart', onPieceDragStart);
-                img.addEventListener('dragend', onPieceDragEnd);
+                img.draggable = supportsFinePointer;
+                if (supportsFinePointer) {
+                    img.addEventListener('dragstart', onPieceDragStart);
+                    img.addEventListener('dragend', onPieceDragEnd);
+                }
                 square.appendChild(img);
             }
 
@@ -436,7 +447,7 @@ function refreshBoard() {
         const kingPos = engine.findKing(engine.turn);
         if (kingPos && engine.isInCheck(engine.turn)) {
             const sq = engine.coordsToSquare(kingPos.row, kingPos.col);
-            const el = bEl.querySelector(`[data-square="${sq}"]`);
+            const el = squares.find(square => square.dataset.square === sq);
             if (el) el.classList.add('in-check');
         }
     });
@@ -564,22 +575,21 @@ function onSquareDrop(event) {
 }
 
 function clearDragOverStates() {
-    const boards = [boardEl, focusBoard].filter(Boolean);
-    boards.forEach(bEl => {
-        bEl.querySelectorAll('.square').forEach(sq => sq.classList.remove('drag-over'));
+    [boardSquares, focusBoardSquares].forEach(squares => {
+        squares.forEach(sq => sq.classList.remove('drag-over'));
     });
 }
 
 function showHighlights(square) {
     clearHighlights();
     const moves = legalMovesCache.filter(m => engine.coordsToSquare(m.from.row, m.from.col) === square);
-    const boards = [boardEl, focusBoard].filter(Boolean);
-    boards.forEach(bEl => {
-        const squareEl = bEl.querySelector(`[data-square="${square}"]`);
+    const boards = [boardSquares, focusBoardSquares].filter(set => set.length);
+    boards.forEach(squares => {
+        const squareEl = squares.find(el => el.dataset.square === square);
         if (squareEl) squareEl.classList.add('selected');
         moves.forEach(m => {
             const target = engine.coordsToSquare(m.to.row, m.to.col);
-            const targetEl = bEl.querySelector(`[data-square="${target}"]`);
+            const targetEl = squares.find(el => el.dataset.square === target);
             if (targetEl) {
                 targetEl.classList.add('highlight-move');
                 if (engine.getPiece(m.to.row, m.to.col)) {
@@ -591,9 +601,8 @@ function showHighlights(square) {
 }
 
 function clearHighlights() {
-    const boards = [boardEl, focusBoard].filter(Boolean);
-    boards.forEach(bEl => {
-        bEl.querySelectorAll('.square').forEach(sq => sq.classList.remove('selected', 'highlight-move', 'capture', 'drag-over'));
+    [boardSquares, focusBoardSquares].forEach(squares => {
+        squares.forEach(sq => sq.classList.remove('selected', 'highlight-move', 'capture', 'drag-over'));
     });
 }
 
