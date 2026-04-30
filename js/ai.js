@@ -1,4 +1,4 @@
-const STOCKFISH_CDN = 'https://cdn.jsdelivr.net/npm/stockfish.js@10.0.2/src/stockfish.js';
+const STOCKFISH_CDN = 'https://cdn.jsdelivr.net/npm/stockfish.js@10.0.2/stockfish.js';
 
 class StockfishClient {
     constructor() {
@@ -128,18 +128,33 @@ class StockfishClient {
     async analyzePosition(fen, options = {}) {
         const moveTimeMs = Math.max(120, Number(options.moveTimeMs) || 250);
         const skillLevel = Math.min(20, Math.max(0, Number(options.skillLevel) || 20));
+        const multiPv = Math.max(1, Number(options.multiPv) || 1);
         await this.init();
 
         this.send(`setoption name Skill Level value ${skillLevel}`);
         this.send('setoption name UCI_LimitStrength value false');
+        this.send(`setoption name MultiPV value ${multiPv}`);
         this.send('isready');
         await this.waitFor(line => line === 'readyok', 5000);
 
         let latestScore = null;
+        const linesByPv = new Map();
         const infoListener = line => {
             if (!line.startsWith('info ') || !line.includes(' score ')) return;
             const parsed = this.parseScoreLine(line);
-            if (parsed) {
+            if (!parsed) return;
+
+            const tokens = line.split(/\s+/);
+            const multiPvIndex = tokens.indexOf('multipv');
+            const pvIndex = multiPvIndex >= 0 ? Number(tokens[multiPvIndex + 1]) : 1;
+            const pvTokenIndex = tokens.indexOf('pv');
+                const depthIndex = tokens.indexOf('depth');
+                const depth = depthIndex >= 0 ? Number(tokens[depthIndex + 1]) : null;
+                const pvMove = pvTokenIndex >= 0 ? tokens[pvTokenIndex + 1] : null;
+                const pvMoves = pvTokenIndex >= 0 ? tokens.slice(pvTokenIndex + 1, pvTokenIndex + 9) : [];
+
+            linesByPv.set(pvIndex, { score: parsed, pvMove, pvMoves, depth });
+            if (pvIndex === 1) {
                 latestScore = parsed;
             }
         };
@@ -152,10 +167,20 @@ class StockfishClient {
             const parts = bestLine.split(/\s+/);
             const bestMove = parts[1] && parts[1] !== '(none)' ? parts[1] : null;
             const normalized = this.normalizeScore(latestScore);
+            const lines = [...linesByPv.entries()]
+                .sort((a, b) => a[0] - b[0])
+                .map(([pvIndex, data]) => ({
+                    pvIndex,
+                    scoreCp: this.normalizeScore(data.score),
+                        pvMove: data.pvMove,
+                        pv: data.pvMoves || [],
+                        depth: data.depth || null,
+                }));
             return {
                 bestMove,
                 scoreCp: normalized,
                 rawScore: latestScore,
+                lines,
             };
         } finally {
             this.offLine(infoListener);

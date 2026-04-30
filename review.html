@@ -20,9 +20,21 @@
                 <button id="backToMatchBtn" class="ghost">Back to Match</button>
             </div>
 
-            <div class="board-shell" id="reviewBoardShell">
-                <div class="board" id="reviewBoard"></div>
+            <div class="review-stage" id="reviewBoardRow">
+                <div class="review-eval-rail" id="reviewEvalRail">
+                    <div class="review-eval-bar" id="reviewEvalBar">
+                        <div class="review-eval-fill" id="reviewEvalFill"></div>
+                        <div class="review-eval-marker" id="reviewEvalMarker"></div>
+                    </div>
+                    <div class="review-eval-score" id="reviewEvalScore">+0.00</div>
+                </div>
+                <div class="board-shell" id="reviewBoardShell">
+                    <canvas class="board-arrow-canvas" id="reviewArrowCanvas"></canvas>
+                    <div class="board" id="reviewBoard"></div>
+                </div>
             </div>
+
+            <canvas class="review-eval-graph" id="reviewEvalGraph"></canvas>
 
             <div class="review-controls" id="reviewControls">
                 <button id="firstMoveBtn" class="ghost">|&lt;</button>
@@ -40,6 +52,18 @@
 
         <aside class="review-side panel">
             <div class="review-meta" id="reviewMeta"></div>
+            <div class="review-engine" id="reviewEnginePanel">
+                <div class="review-engine-head">
+                    <h3>Engine Lines</h3>
+                    <span class="review-engine-status" id="reviewEngineStatus">Waiting</span>
+                </div>
+                <div class="review-engine-line" id="reviewBestLine">Best: --</div>
+                <div class="review-engine-line alt" id="reviewAltLine">Alt: --</div>
+                <div class="review-engine-meta">
+                    <span id="reviewDepthText">Depth --</span>
+                    <span id="reviewEvalText">Eval 0.00</span>
+                </div>
+            </div>
             <ol class="review-move-list" id="reviewMoveList"></ol>
             <p class="review-empty" id="reviewEmpty">Finish a game first, then open review.</p>
         </aside>

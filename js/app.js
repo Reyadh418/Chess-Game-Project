@@ -1199,8 +1199,8 @@ async function analyzeCompletedGameWithStockfish(moves, token) {
             reviewProgressEl.textContent = `Analyzing move ${i + 1} / ${moves.length}...`;
         }
 
-        const pre = await reviewEngine.analyzePosition(item.preFen, { moveTimeMs: 180, skillLevel: 20 });
-        const post = await reviewEngine.analyzePosition(item.postFen, { moveTimeMs: 180, skillLevel: 20 });
+        const pre = await reviewEngine.analyzePosition(item.preFen, { moveTimeMs: 260, skillLevel: 20, multiPv: 2 });
+        const post = await reviewEngine.analyzePosition(item.postFen, { moveTimeMs: 260, skillLevel: 20, multiPv: 1 });
 
         const bestScore = Number(pre.scoreCp) || 0;
         const playedScore = -((Number(post.scoreCp) || 0));
@@ -1208,7 +1208,9 @@ async function analyzeCompletedGameWithStockfish(moves, token) {
         const cpLoss = Math.max(0, Math.min(2000, Math.round(cpLossRaw)));
         const bestUci = pre.bestMove || '';
         const isBest = bestUci && bestUci === item.uci;
-        const verdict = classifyMove(cpLoss, isBest);
+        const bestGap = getBestGap(pre);
+        const materialDelta = getMaterialDelta(item.preFen, item.postFen, item.moverColor);
+        const verdict = classifyMove({ cpLoss, isBest, bestGap, materialDelta, bestScore, playedScore });
 
         if (item.moverColor === 'w') {
             whiteCplTotal += cpLoss;
@@ -1273,7 +1275,8 @@ function analyzeCompletedGameFallback(moves, token) {
         const bestUci = toUciMoveFromEngineMove(sim, bestMove);
         const playedUci = toUciMoveFromEngineMove(sim, playedMove);
         const isBest = bestUci === playedUci;
-        const verdict = classifyMove(cpLoss, isBest);
+        const materialDelta = getMaterialDelta(item.preFen, item.postFen, moverColor);
+        const verdict = classifyMove({ cpLoss, isBest, bestGap: 0, materialDelta, bestScore, playedScore });
 
         if (moverColor === 'w') {
             whiteCplTotal += cpLoss;
@@ -1336,20 +1339,63 @@ function runFallbackReview(moves, token, rootError) {
     }
 }
 
-function classifyMove(cpLoss, isBest) {
-    if (isBest || cpLoss <= 15) {
-        return { key: 'best', icon: '★', label: 'Best Move' };
+const reviewPieceValues = { p: 100, n: 320, b: 330, r: 500, q: 900, k: 0 };
+
+function materialFromFen(fen) {
+    const placement = String(fen || '').split(' ')[0] || '';
+    let white = 0;
+    let black = 0;
+    for (const char of placement) {
+        if (char === '/' || (char >= '1' && char <= '8')) continue;
+        const lower = char.toLowerCase();
+        const value = reviewPieceValues[lower] || 0;
+        if (char === lower) {
+            black += value;
+        } else {
+            white += value;
+        }
     }
-    if (cpLoss <= 35) {
-        return { key: 'excellent', icon: '!!', label: 'Excellent' };
+    return { w: white, b: black };
+}
+
+function getMaterialDelta(preFen, postFen, moverColor) {
+    if (!preFen || !postFen || (moverColor !== 'w' && moverColor !== 'b')) return 0;
+    const pre = materialFromFen(preFen);
+    const post = materialFromFen(postFen);
+    return (post[moverColor] || 0) - (pre[moverColor] || 0);
+}
+
+function getBestGap(preAnalysis) {
+    if (!preAnalysis || !Array.isArray(preAnalysis.lines) || preAnalysis.lines.length < 2) return 0;
+    const top = Number(preAnalysis.lines[0].scoreCp) || 0;
+    const second = Number(preAnalysis.lines[1].scoreCp) || 0;
+    return Math.max(0, top - second);
+}
+
+function classifyMove({ cpLoss, isBest, bestGap = 0, materialDelta = 0 }) {
+    const loss = Math.max(0, Number(cpLoss) || 0);
+    const onlyMove = isBest && bestGap >= 180;
+    const sacrificed = materialDelta <= -300;
+
+    if (isBest && sacrificed && loss <= 10) {
+        return { key: 'brilliant', icon: '!!', label: 'Brilliant Move' };
     }
-    if (cpLoss <= 80) {
-        return { key: 'good', icon: '!', label: 'Good' };
+    if (isBest && onlyMove && loss <= 25) {
+        return { key: 'great', icon: '!', label: 'Great Move' };
     }
-    if (cpLoss <= 150) {
+    if (isBest && loss <= 15) {
+        return { key: 'best', icon: '*', label: 'Best Move' };
+    }
+    if (loss <= 30) {
+        return { key: 'excellent', icon: '!?', label: 'Excellent Move' };
+    }
+    if (loss <= 70) {
+        return { key: 'good', icon: '!', label: 'Good Move' };
+    }
+    if (loss <= 140) {
         return { key: 'inaccuracy', icon: '?!', label: 'Inaccuracy' };
     }
-    if (cpLoss <= 300) {
+    if (loss <= 300) {
         return { key: 'mistake', icon: '?', label: 'Mistake' };
     }
     return { key: 'blunder', icon: '??', label: 'Blunder' };
