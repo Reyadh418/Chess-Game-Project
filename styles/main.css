@@ -71,7 +71,7 @@ h1 {
 }
 
 .top-actions button {
-    min-width: 120px;
+    min-width: 0;
 }
 
 button {
@@ -402,14 +402,14 @@ button.resign {
 }
 
 .segmented {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
-}
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+    }
 
-.segmented.small {
-    grid-template-columns: repeat(3, 1fr);
-}
+    .segmented.small {
+        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    }
 
 .seg {
     padding: 10px 12px;
@@ -464,23 +464,49 @@ button.resign {
     grid-row: span 2;
 }
 
-.theme-card .title {
-    font-weight: 700;
-}
+@media (max-width: 720px) {
+    .theme-grid {
+        grid-template-columns: 1fr;
+    }
 
-.theme-card .lock {
-    color: var(--muted);
-    font-size: 12px;
-}
+    .theme-card {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto auto;
+        align-items: stretch;
+    }
 
-.theme-card.locked {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
+    .theme-card .swatch {
+        width: 100%;
+        height: 70px;
+        border-radius: 14px;
+        grid-row: 1;
+    }
 
-.theme-card.active {
-    border-color: rgba(255, 255, 255, 0.18);
-    box-shadow: 0 10px 30px rgba(90, 208, 255, 0.3);
+    .theme-card .title,
+    .theme-card .lock {
+        justify-self: start;
+    }
+
+    .chips {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    .label-row {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .label-row .pill,
+    .label-row .value {
+        width: 100%;
+    }
+
+    .segmented,
+    .segmented.small {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
 }
 
 .hint {
@@ -723,6 +749,7 @@ button.resign {
 @media (max-width: 720px) {
     body {
         padding: 14px;
+        background-attachment: scroll;
     }
 
     .layout {
