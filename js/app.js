@@ -99,6 +99,9 @@ let gameMoves = [];
 let gameResultText = '';
 let reviewRequestToken = 0;
 let dragSourceSquare = null;
+let muteToggleBtn = null;
+let audioMuted = false;
+const AUDIO_SETTINGS_KEY = 'aurumAudioMuted';
 
 const reviewEngine = new StockfishClient();
 
@@ -179,9 +182,11 @@ function init() {
     focusCapturedBlack = document.getElementById('focusCapturedBlack');
     focusPostActions = document.getElementById('focusPostActions');
     toastContainer = document.getElementById('toastContainer');
+    muteToggleBtn = document.getElementById('muteToggleBtn');
 
     unlockCount = loadUnlocks();
     loadMatchSettings();
+    loadAudioSetting();
 
     buildBoard();
     buildFocusBoard();
@@ -199,9 +204,13 @@ function buildBoard() {
     for (let row = 0; row < 8; row++) {
         for (let col = 0; col < 8; col++) {
             const square = document.createElement('button');
+            square.type = 'button';
             square.className = `square ${(row + col) % 2 === 0 ? 'light' : 'dark'}`;
             square.dataset.square = engine.coordsToSquare(row, col);
+            square.setAttribute('aria-roledescription', 'chess square');
+            square.setAttribute('aria-label', square.dataset.square);
             square.addEventListener('click', () => onSquareClick(square.dataset.square));
+            square.addEventListener('keydown', onSquareKeyDown);
             square.addEventListener('dragover', onSquareDragOver);
             square.addEventListener('dragleave', onSquareDragLeave);
             square.addEventListener('drop', onSquareDrop);
@@ -218,9 +227,13 @@ function buildFocusBoard() {
     for (let row = 0; row < 8; row++) {
         for (let col = 0; col < 8; col++) {
             const square = document.createElement('button');
+            square.type = 'button';
             square.className = `square ${(row + col) % 2 === 0 ? 'light' : 'dark'}`;
             square.dataset.square = engine.coordsToSquare(row, col);
+            square.setAttribute('aria-roledescription', 'chess square');
+            square.setAttribute('aria-label', square.dataset.square);
             square.addEventListener('click', () => onSquareClick(square.dataset.square));
+            square.addEventListener('keydown', onSquareKeyDown);
             square.addEventListener('dragover', onSquareDragOver);
             square.addEventListener('dragleave', onSquareDragLeave);
             square.addEventListener('drop', onSquareDrop);
@@ -290,6 +303,7 @@ function bindControls() {
         renderThemes();
         refreshUnlockDisplay();
     });
+    if (muteToggleBtn) muteToggleBtn.addEventListener('click', toggleAudioMute);
     if (undoBtn) undoBtn.addEventListener('click', () => {
         if (engine.history.length === 0 || gameOver) return;
         aiMoveToken += 1;
@@ -336,7 +350,11 @@ function renderThemes() {
         card.classList.toggle('locked', locked);
         card.classList.toggle('locked-control', gameStarted);
         card.querySelector('.lock').textContent = locked ? 'Locked' : 'Unlocked';
-        if (!locked && !gameStarted) {
+        card.setAttribute('aria-label', `${theme.name}${locked ? ', locked' : ', unlocked'}${activeTheme === theme.id ? ', selected' : ''}`);
+        card.setAttribute('aria-pressed', String(activeTheme === theme.id && !locked));
+        if (locked) {
+            card.disabled = true;
+        } else if (!gameStarted) {
             card.addEventListener('click', () => selectTheme(theme.id));
         }
         if (activeTheme === theme.id) {
@@ -439,6 +457,18 @@ function refreshBoard() {
                 square.appendChild(img);
             }
 
+            const selected = algebraic === selectedSquare;
+            const hasMoves = legalMovesCache.some(m => engine.coordsToSquare(m.from.row, m.from.col) === algebraic);
+            const colorName = piece ? (piece.color === 'w' ? 'White' : 'Black') : null;
+            const typeName = piece ? ({ p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen', k: 'king' }[piece.type] || piece.type) : null;
+            const labelParts = [algebraic];
+            if (colorName && typeName) {
+                labelParts.push(`${colorName} ${typeName}`);
+            }
+            if (selected) labelParts.push('selected');
+            if (hasMoves) labelParts.push('has legal moves');
+            square.setAttribute('aria-label', labelParts.join(', '));
+
             if (lastMoveSquares.includes(algebraic)) {
                 square.classList.add('last-move');
             }
@@ -486,6 +516,42 @@ function onSquareClick(square) {
     if (piece && piece.color === engine.turn) {
         selectedSquare = square;
         showHighlights(square);
+    }
+}
+
+function onSquareKeyDown(event) {
+    const square = event.currentTarget && event.currentTarget.dataset ? event.currentTarget.dataset.square : null;
+    if (!square) return;
+
+    if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        onSquareClick(square);
+        return;
+    }
+
+    if (event.key === 'Escape') {
+        clearHighlights();
+        selectedSquare = null;
+        return;
+    }
+
+    const { row, col } = engine.squareToCoords(square);
+    let nextRow = row;
+    let nextCol = col;
+    if (event.key === 'ArrowUp') nextRow = Math.max(0, row - 1);
+    if (event.key === 'ArrowDown') nextRow = Math.min(7, row + 1);
+    if (event.key === 'ArrowLeft') nextCol = Math.max(0, col - 1);
+    if (event.key === 'ArrowRight') nextCol = Math.min(7, col + 1);
+    if (nextRow !== row || nextCol !== col) {
+        event.preventDefault();
+        const target = engine.coordsToSquare(nextRow, nextCol);
+        const boardSet = boardSquares.includes(event.currentTarget)
+            ? boardSquares
+            : focusBoardSquares.includes(event.currentTarget)
+                ? focusBoardSquares
+                : [...boardSquares, ...focusBoardSquares];
+        const nextButton = boardSet.find(el => el.dataset.square === target);
+        if (nextButton) nextButton.focus();
     }
 }
 
@@ -1050,6 +1116,7 @@ function playTone({ freq = 440, duration = 0.12, volume = 0.15, type = 'sine' })
 }
 
 function playSound(kind) {
+    if (audioMuted) return;
     const sounds = {
         move: () => playTone({ freq: 540, duration: 0.09, volume: 0.12, type: 'sine' }),
         capture: () => {
@@ -1064,6 +1131,24 @@ function playSound(kind) {
     };
     const fn = sounds[kind];
     if (fn) fn();
+}
+
+function loadAudioSetting() {
+    const raw = storage.get(AUDIO_SETTINGS_KEY);
+    audioMuted = raw === 'true';
+    updateMuteButton();
+}
+
+function toggleAudioMute() {
+    audioMuted = !audioMuted;
+    storage.set(AUDIO_SETTINGS_KEY, String(audioMuted));
+    updateMuteButton();
+}
+
+function updateMuteButton() {
+    if (!muteToggleBtn) return;
+    muteToggleBtn.textContent = audioMuted ? 'Unmute sounds' : 'Mute sounds';
+    muteToggleBtn.setAttribute('aria-pressed', String(audioMuted));
 }
 
 /* ── Captured pieces ── */

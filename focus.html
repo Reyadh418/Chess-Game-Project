@@ -43,14 +43,17 @@
         </div>
 
         <div class="focus-right panel">
+            <div class="focus-action-row">
+                <button id="muteToggleBtn" class="ghost" type="button" aria-pressed="false">Mute sounds</button>
+            </div>
             <div class="focus-info">
                 <div class="status">
                     <p class="label">Status</p>
-                    <p class="value" id="focusStatusText">Ready</p>
+                    <p class="value" id="focusStatusText" role="status" aria-live="polite">Ready</p>
                 </div>
                 <div class="status">
                     <p class="label">Turn</p>
-                    <p class="value" id="focusTurnText">White</p>
+                    <p class="value" id="focusTurnText" role="status" aria-live="polite">White</p>
                 </div>
             </div>
             <div class="label-row">
