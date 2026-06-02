@@ -58,15 +58,15 @@
             </div>
             <div class="label-row">
                 <p class="label">Move List</p>
-                <button class="ghost" id="focusUndoBtn">Undo</button>
+                <button class="ghost" id="focusUndoBtn" type="button" aria-label="Undo last move">Undo</button>
             </div>
             <ol id="focusMoveList" class="move-list"></ol>
-            <button id="resignBtn" class="resign secondary">Resign Match</button>
+            <button id="resignBtn" class="resign secondary" type="button" aria-label="Resign the current match">Resign Match</button>
             <div class="focus-post-actions" id="focusPostActions">
-                <button id="reviewGameBtn" class="ghost post-match-action" disabled>Review Game</button>
-                <button class="ghost exit-focus-btn post-match-action" id="exitFocusBtn">Exit Match</button>
+                <button id="reviewGameBtn" class="ghost post-match-action" type="button" disabled aria-label="Open post-game review">Review Game</button>
+                <button class="ghost exit-focus-btn post-match-action" id="exitFocusBtn" type="button" aria-label="Exit the match page">Exit Match</button>
             </div>
-            <button id="newGameBtn" class="primary">New Match</button>
+            <button id="newGameBtn" class="primary" type="button" aria-label="Start a fresh match">New Match</button>
         </div>
     </div>
 

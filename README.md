@@ -10,7 +10,8 @@ A polished browser chess experience with Player vs AI and pass-and-play modes. B
 - **Time controls:** Untimed, 3:00, or 10:00 per side with flag-fall detection.
 - **Focus Mode:** Distraction-free view with clocks, captured pieces, move list, and exit button.
 - **Board skins & unlocks:** 10 themes; 1 is free, and the rest unlock as you beat the AI (progress stored in localStorage under `aurumUnlocks`).
-- **Quality-of-life:** Undo, move list with castles/promotions, captured pieces tray, status/check highlights, toast notifications, and subtle sounds.
+- **Quality-of-life:** Undo, move list with castles/promotions, captured pieces tray, status/check highlights, toast notifications, subtle sounds, and a mute toggle for audio.
+- **Accessibility polish:** Keyboard-friendly board navigation, clearer button labels, live status updates, and stronger focus styles for easier use on desktop and assistive devices.
 
 ## Getting Started
 1) Clone or download this repository.
@@ -22,7 +23,7 @@ If you run into file system and storage/audio permission issues, open via a simp
 ## How to Play
 - **Start:** Configure settings on homepage and click **Start Game**.
 - **AI difficulty:** Choose Easy/Medium/Hard before starting; difficulty is locked mid-game.
-- **Moves:** Click a piece, then a highlighted square. Legal moves include check, castling, en passant, and promotion (auto-queen).
+- **Moves:** Click a piece, then a highlighted square. You can also use the keyboard to move focus between squares and press Enter/Space to select or play a move. Legal moves include check, castling, en passant, and promotion (auto-queen).
 - **Undo:** Reverts the last full turn; in AI mode, undo twice rolls back both sides.
 - **Time controls:** Select before starting; timers auto-start on the first move. Flag ends the game.
 - **Match page:** Gameplay runs only in the dedicated match page. After game end, **Review Game** and **Exit Match** appear.
@@ -39,7 +40,8 @@ If you run into file system and storage/audio permission issues, open via a simp
 
 ## Notes
 - Progress is stored locally; clearing site data resets unlocks.
-- Sounds use the Web Audio API and may require a user gesture to start on some browsers.
+- Sounds use the Web Audio API and may require a user gesture to start on some browsers. A mute toggle is available in the match page.
+- Accessibility updates include keyboard-friendly board navigation, clearer labels, focus-visible states, and live status announcements.
 - The engine treats a missing king as in check to guard against corrupted states.
 - Stockfish is loaded at runtime from jsDelivr (`stockfish.js`). If the CDN is blocked/offline, AI falls back to the built-in engine automatically.
 - Game review also relies on Stockfish runtime loading; if unavailable, review displays an error and can be retried with **Review Game**.
