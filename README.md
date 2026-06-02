@@ -23,10 +23,18 @@ If you run into file system and storage/audio permission issues, open via a simp
 ## How to Play
 - **Start:** Configure settings on homepage and click **Start Game**.
 - **AI difficulty:** Choose Easy/Medium/Hard before starting; difficulty is locked mid-game.
-- **Moves:** Click a piece, then a highlighted square. You can also use the keyboard to move focus between squares and press Enter/Space to select or play a move. Legal moves include check, castling, en passant, and promotion (auto-queen).
+- **Mouse play:** Click a piece, then click a highlighted legal square to make a move.
+- **Keyboard play:**
+  1. Use the Arrow keys to move the focus between board squares.
+  2. Press Enter or Space on a piece to select it.
+  3. Press Enter or Space again on a highlighted legal destination square to make the move.
+  4. Press Escape to clear the current selection.
+  5. Use the on-screen **Undo** button for a full turn rewind.
+- **Legal moves:** Castling, en passant, check, and promotion (auto-queen) are all supported.
 - **Undo:** Reverts the last full turn; in AI mode, undo twice rolls back both sides.
 - **Time controls:** Select before starting; timers auto-start on the first move. Flag ends the game.
 - **Match page:** Gameplay runs only in the dedicated match page. After game end, **Review Game** and **Exit Match** appear.
+- **Audio:** Use the **Mute sounds** button in the match page if you want to turn off move effects.
 - **Unlocks:** Win vs AI as White to increment your unlocked theme count (max 10). Reset via **Reset Unlocks**.
 
 ## Files
