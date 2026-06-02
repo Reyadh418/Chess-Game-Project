@@ -92,6 +92,12 @@ button:hover {
     border-color: rgba(255, 255, 255, 0.18);
 }
 
+button:focus-visible {
+    outline: 3px solid var(--accent-strong);
+    outline-offset: 3px;
+    box-shadow: 0 0 0 4px rgba(126, 243, 198, 0.15);
+}
+
 button:active {
     transform: translateY(0);
 }
@@ -1050,6 +1056,12 @@ body.focus-active > .focus-layout.active {
     flex-direction: column;
     gap: 12px;
     overflow: hidden;
+}
+
+.focus-action-row {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
 }
 
 .focus-info {

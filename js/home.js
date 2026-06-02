@@ -72,8 +72,12 @@ function bindControls() {
 
     document.querySelectorAll('#aiControls .seg').forEach(btn => {
         btn.addEventListener('click', () => {
-            document.querySelectorAll('#aiControls .seg').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('#aiControls .seg').forEach(b => {
+                b.classList.remove('active');
+                b.setAttribute('aria-pressed', 'false');
+            });
             btn.classList.add('active');
+            btn.setAttribute('aria-pressed', 'true');
             difficulty = btn.dataset.difficulty || 'easy';
             saveSettings();
         });
@@ -82,8 +86,12 @@ function bindControls() {
     if (playerColorControls) {
         playerColorControls.querySelectorAll('.chip').forEach(btn => {
             btn.addEventListener('click', () => {
-                playerColorControls.querySelectorAll('.chip').forEach(b => b.classList.remove('active'));
+                playerColorControls.querySelectorAll('.chip').forEach(b => {
+                    b.classList.remove('active');
+                    b.setAttribute('aria-pressed', 'false');
+                });
                 btn.classList.add('active');
+                btn.setAttribute('aria-pressed', 'true');
                 playerColor = btn.dataset.color || 'random';
                 saveSettings();
             });
@@ -92,8 +100,12 @@ function bindControls() {
 
     timeButtons.forEach(btn => {
         btn.addEventListener('click', () => {
-            timeButtons.forEach(b => b.classList.remove('active'));
+            timeButtons.forEach(b => {
+                b.classList.remove('active');
+                b.setAttribute('aria-pressed', 'false');
+            });
             btn.classList.add('active');
+            btn.setAttribute('aria-pressed', 'true');
             timeControl = String(btn.dataset.time || 'untimed');
             saveSettings();
         });
@@ -133,23 +145,35 @@ function applyColorControlVisibility() {
 }
 
 function applyUiState() {
-    if (modeAIButton) modeAIButton.classList.toggle('active', mode === 'ai');
-    if (modePvpButton) modePvpButton.classList.toggle('active', mode === 'pvp');
+    if (modeAIButton) {
+        modeAIButton.classList.toggle('active', mode === 'ai');
+        modeAIButton.setAttribute('aria-pressed', String(mode === 'ai'));
+    }
+    if (modePvpButton) {
+        modePvpButton.classList.toggle('active', mode === 'pvp');
+        modePvpButton.setAttribute('aria-pressed', String(mode === 'pvp'));
+    }
     if (aiControls) aiControls.style.display = mode === 'ai' ? 'block' : 'none';
     applyColorControlVisibility();
 
     document.querySelectorAll('#aiControls .seg').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.difficulty === difficulty);
+        const active = btn.dataset.difficulty === difficulty;
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-pressed', String(active));
     });
 
     if (playerColorControls) {
         playerColorControls.querySelectorAll('.chip').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.color === playerColor);
+            const active = btn.dataset.color === playerColor;
+            btn.classList.toggle('active', active);
+            btn.setAttribute('aria-pressed', String(active));
         });
     }
 
     timeButtons.forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.time === timeControl);
+        const active = btn.dataset.time === timeControl;
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-pressed', String(active));
     });
 }
 
@@ -186,7 +210,10 @@ function renderThemes() {
 function highlightTheme() {
     document.querySelectorAll('.theme-card').forEach(card => {
         const id = Number(card.dataset.theme);
-        card.classList.toggle('active', id === activeTheme);
+        const active = id === activeTheme;
+        card.classList.toggle('active', active);
+        card.setAttribute('aria-pressed', String(active));
+        card.setAttribute('aria-label', `${card.querySelector('.title').textContent}${active ? ', selected' : ''}`);
     });
 }
 
