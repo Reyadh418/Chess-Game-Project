@@ -23,7 +23,7 @@ If you run into file system and storage/audio permission issues, open via a simp
 ## How to Play
 - **Start:** Configure settings on homepage and click **Start Game**.
 - **AI difficulty:** Choose Easy/Medium/Hard before starting; difficulty is locked mid-game.
-- **Mouse play:** Click a piece, then click a highlighted legal square to make a move.
+- **Mouse play:** Click a piece, then click a highlighted legal square to make a move, or drag a piece to a legal destination square for a smoother feel.
 - **Keyboard play:**
   1. Use the Arrow keys to move the focus between board squares.
   2. Press Enter or Space on a piece to select it.
