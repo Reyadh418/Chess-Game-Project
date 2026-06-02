@@ -561,7 +561,8 @@ function onPieceDragStart(event) {
         return;
     }
 
-    const squareEl = event.target && event.target.parentElement;
+    const pieceEl = event.target;
+    const squareEl = pieceEl && pieceEl.parentElement;
     const fromSquare = squareEl && squareEl.dataset ? squareEl.dataset.square : null;
     if (!fromSquare) {
         event.preventDefault();
@@ -578,6 +579,8 @@ function onPieceDragStart(event) {
     dragSourceSquare = fromSquare;
     selectedSquare = fromSquare;
     showHighlights(fromSquare);
+    if (pieceEl) pieceEl.classList.add('dragging');
+    if (squareEl) squareEl.classList.add('dragging-source');
 
     if (event.dataTransfer) {
         event.dataTransfer.effectAllowed = 'move';
@@ -585,7 +588,11 @@ function onPieceDragStart(event) {
     }
 }
 
-function onPieceDragEnd() {
+function onPieceDragEnd(event) {
+    const pieceEl = event.target;
+    if (pieceEl) pieceEl.classList.remove('dragging');
+    const squareEl = pieceEl && pieceEl.parentElement;
+    if (squareEl) squareEl.classList.remove('dragging-source');
     dragSourceSquare = null;
     clearDragOverStates();
 }
@@ -606,12 +613,14 @@ function onSquareDragOver(event) {
 
     if (hasLegalMove) {
         event.currentTarget.classList.add('drag-over');
+        event.currentTarget.classList.add('drop-ready');
     }
 }
 
 function onSquareDragLeave(event) {
     if (!event.currentTarget) return;
     event.currentTarget.classList.remove('drag-over');
+    event.currentTarget.classList.remove('drop-ready');
 }
 
 function onSquareDrop(event) {
@@ -642,7 +651,10 @@ function onSquareDrop(event) {
 
 function clearDragOverStates() {
     [boardSquares, focusBoardSquares].forEach(squares => {
-        squares.forEach(sq => sq.classList.remove('drag-over'));
+        squares.forEach(sq => {
+            sq.classList.remove('drag-over');
+            sq.classList.remove('drop-ready');
+        });
     });
 }
 
@@ -668,7 +680,7 @@ function showHighlights(square) {
 
 function clearHighlights() {
     [boardSquares, focusBoardSquares].forEach(squares => {
-        squares.forEach(sq => sq.classList.remove('selected', 'highlight-move', 'capture', 'drag-over'));
+        squares.forEach(sq => sq.classList.remove('selected', 'highlight-move', 'capture', 'drag-over', 'drop-ready'));
     });
 }
 
