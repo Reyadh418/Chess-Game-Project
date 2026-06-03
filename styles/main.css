@@ -657,8 +657,13 @@ button.resign {
 }
 
 .square .piece {
-    width: 84%;
-    height: 84%;
+    width: 100%;
+    height: 100%;
+    min-width: 26px;
+    min-height: 26px;
+    max-width: 56px;
+    max-height: 56px;
+    aspect-ratio: 1 / 1;
     display: block;
     pointer-events: auto;
     user-select: none;
@@ -667,6 +672,7 @@ button.resign {
     cursor: grab;
     object-fit: contain;
     filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
+    transform: translateZ(0);
 }
 
 .square .piece.dragging {
@@ -1923,7 +1929,8 @@ body.focus-active .hero-grid {
         flex-direction: column;
         align-items: stretch;
         width: 100vw;
-        height: 100dvh;
+        min-height: 100dvh;
+        height: auto;
         overflow-y: auto;
         overflow-x: hidden;
         padding: 10px;
@@ -1944,11 +1951,11 @@ body.focus-active .hero-grid {
     }
 
     .focus-board-area .board-shell {
-        width: 100%;
-        max-width: 100%;
+        width: min(100%, 560px);
+        max-width: 560px;
         height: auto;
         aspect-ratio: 1 / 1;
-        max-height: 72vh;
+        max-height: min(72vh, 560px);
         margin: 0 auto;
     }
 
@@ -1989,7 +1996,7 @@ body.focus-active .hero-grid {
     }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 600px), (max-height: 700px) and (orientation: landscape) {
     .focus-layout.active {
         gap: 8px;
         padding: 8px;
@@ -2002,7 +2009,9 @@ body.focus-active .hero-grid {
     }
 
     .focus-board-area .board-shell {
-        max-height: 82vw;
+        width: min(100vw - 16px, 420px);
+        max-width: 420px;
+        max-height: min(92vw, 420px);
     }
 
     .focus-center {
