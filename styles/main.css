@@ -1201,23 +1201,33 @@ body.focus-active > .focus-layout.active {
     align-items: center;
     justify-items: center;
     gap: 8px;
-    width: 44px;
+    width: 60px;
+    min-width: 60px;
     height: 100%;
-    padding: 6px 4px;
-    border-radius: 12px;
-    background: rgba(8, 12, 22, 0.6);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 8px 6px;
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(9, 14, 24, 0.96), rgba(7, 10, 18, 0.98));
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 12px 24px rgba(0, 0, 0, 0.35);
 }
 
 .review-eval-bar {
     position: relative;
-    width: 12px;
+    width: 14px;
     height: 100%;
     border-radius: 999px;
-    border: 1px solid var(--stroke);
-    background: linear-gradient(180deg, #f4f7ff 0%, #f4f7ff 50%, #0f1420 50%, #0f1420 100%);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: linear-gradient(180deg, rgba(20, 28, 44, 0.98) 0%, rgba(10, 14, 24, 0.98) 100%);
     overflow: hidden;
-    box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.25);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03), inset 0 0 12px rgba(0, 0, 0, 0.45);
+}
+
+.review-eval-bar::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 35%, rgba(255, 255, 255, 0.04) 70%, transparent);
+    pointer-events: none;
 }
 
 .review-eval-fill {
@@ -1226,31 +1236,59 @@ body.focus-active > .focus-layout.active {
     bottom: 0;
     width: 100%;
     height: 50%;
-    background: #f4f7ff;
-    transition: height 0.2s ease;
+    border-radius: inherit;
+    background: linear-gradient(180deg, rgba(126, 243, 198, 0.98), rgba(90, 208, 255, 0.98));
+    box-shadow: 0 0 18px rgba(90, 208, 255, 0.35);
+    transition: height 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.review-eval-bar[data-side="black"] .review-eval-fill {
+    background: linear-gradient(180deg, rgba(255, 179, 71, 0.98), rgba(255, 125, 144, 0.98));
+    box-shadow: 0 0 18px rgba(255, 145, 97, 0.35);
+}
+
+.review-eval-bar[data-side="balanced"] .review-eval-fill {
+    background: linear-gradient(180deg, rgba(126, 243, 198, 0.92), rgba(255, 210, 143, 0.95));
+    box-shadow: 0 0 16px rgba(255, 210, 143, 0.25);
 }
 
 .review-eval-marker {
     position: absolute;
-    left: -4px;
-    width: 20px;
-    height: 2px;
-    background: var(--accent-2);
-    box-shadow: 0 0 8px rgba(90, 208, 255, 0.6);
+    left: 50%;
+    width: 22px;
+    height: 3px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.95), rgba(90, 208, 255, 0.98));
+    box-shadow: 0 0 10px rgba(90, 208, 255, 0.8), 0 0 18px rgba(126, 243, 198, 0.18);
     top: 50%;
-    transform: translateY(-50%);
+    transform: translate(-50%, -50%);
+    z-index: 2;
 }
 
 .review-eval-score {
     font-size: 12px;
-    font-weight: 700;
+    font-weight: 800;
+    letter-spacing: 0.02em;
     color: var(--text);
     padding: 6px 8px;
     border-radius: 999px;
     border: 1px solid rgba(255, 255, 255, 0.16);
     background: rgba(255, 255, 255, 0.06);
     text-align: center;
-    min-width: 58px;
+    min-width: 68px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 8px 18px rgba(0, 0, 0, 0.18);
+}
+
+.review-eval-score.positive {
+    color: #aefad6;
+    border-color: rgba(126, 243, 198, 0.28);
+    background: rgba(126, 243, 198, 0.12);
+}
+
+.review-eval-score.negative {
+    color: #ffd7b7;
+    border-color: rgba(255, 179, 71, 0.28);
+    background: rgba(255, 179, 71, 0.12);
 }
 
 .review-head {
