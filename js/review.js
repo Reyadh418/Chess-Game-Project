@@ -31,6 +31,15 @@ const pieceIcons = {
     bk: 'https://upload.wikimedia.org/wikipedia/commons/f/f0/Chess_kdt45.svg',
 };
 
+const pieceNames = {
+    p: 'Pawn',
+    n: 'Knight',
+    b: 'Bishop',
+    r: 'Rook',
+    q: 'Queen',
+    k: 'King',
+};
+
 const reviewEngine = new StockfishClient();
 const reviewPieceValues = { p: 100, n: 320, b: 330, r: 500, q: 900, k: 0 };
 
@@ -64,6 +73,7 @@ let reviewProgressTextEl;
 let reviewMetaEl;
 let reviewMoveListEl;
 let reviewEmptyEl;
+let reviewEnginePanelEl;
 let controlsWrapEl;
 let firstMoveBtn;
 let prevMoveBtn;
@@ -109,6 +119,7 @@ function init() {
     reviewMetaEl = document.getElementById('reviewMeta');
     reviewMoveListEl = document.getElementById('reviewMoveList');
     reviewEmptyEl = document.getElementById('reviewEmpty');
+    reviewEnginePanelEl = document.getElementById('reviewEnginePanel');
     controlsWrapEl = document.getElementById('reviewControls');
     firstMoveBtn = document.getElementById('firstMoveBtn');
     prevMoveBtn = document.getElementById('prevMoveBtn');
@@ -140,7 +151,7 @@ function bindControls() {
     if (playPauseBtn) playPauseBtn.addEventListener('click', toggleAutoplay);
 
     window.addEventListener('keydown', event => {
-        if (!moves.length) return;
+        if (!moves.length || shouldIgnoreKey(event)) return;
         if (event.key === 'ArrowLeft') {
             event.preventDefault();
             jumpToPly(currentPly - 1);
@@ -149,7 +160,25 @@ function bindControls() {
             event.preventDefault();
             jumpToPly(currentPly + 1);
         }
+        if (event.key === 'Home') {
+            event.preventDefault();
+            jumpToPly(0);
+        }
+        if (event.key === 'End') {
+            event.preventDefault();
+            jumpToPly(moves.length);
+        }
+        if (event.key === ' ' || event.key === 'Spacebar') {
+            event.preventDefault();
+            toggleAutoplay();
+        }
     });
+}
+
+function shouldIgnoreKey(event) {
+    const target = event.target;
+    if (!target || !target.closest) return false;
+    return Boolean(target.closest('input, textarea, select, button, a'));
 }
 
 function loadReviewData() {
@@ -279,10 +308,10 @@ function renderMeta() {
 
     reviewResultEl.textContent = result;
     reviewMetaEl.innerHTML = [
-        `<p><span>Mode</span><strong>${modeText}</strong></p>`,
-        `<p><span>Difficulty</span><strong>${capitalize(difficultyText)}</strong></p>`,
-        `<p><span>Time</span><strong>${formatTimeControl(timeText)}</strong></p>`,
-        `<p><span>Saved</span><strong>${saved}</strong></p>`,
+        `<p role="listitem"><span>Mode</span><strong>${modeText}</strong></p>`,
+        `<p role="listitem"><span>Difficulty</span><strong>${capitalize(difficultyText)}</strong></p>`,
+        `<p role="listitem"><span>Time</span><strong>${formatTimeControl(timeText)}</strong></p>`,
+        `<p role="listitem"><span>Saved</span><strong>${saved}</strong></p>`,
     ].join('');
 }
 
@@ -301,12 +330,20 @@ function renderMoveList() {
     reviewEmptyEl.style.display = 'none';
     controlsWrapEl.style.display = 'grid';
 
+    const fragment = document.createDocumentFragment();
+
     moves.forEach((move, index) => {
         const li = document.createElement('li');
         li.className = 'review-nav-move';
         li.dataset.ply = String(index + 1);
 
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'review-nav-button';
+
         const prefix = move.moverColor === 'w' ? `${move.moveNumber}.` : `${move.moveNumber}...`;
+        button.setAttribute('aria-label', `Move ${prefix} ${move.notation}`);
+
         const top = document.createElement('div');
         top.className = 'review-nav-top';
 
@@ -320,18 +357,21 @@ function renderMoveList() {
 
         top.appendChild(text);
         top.appendChild(badge);
-        li.appendChild(top);
+        button.appendChild(top);
+        li.appendChild(button);
 
         const cached = analysisResults.get(index + 1);
         if (cached) {
             applyBadgeToMove(li, cached);
         }
 
-        li.addEventListener('click', () => jumpToPly(index + 1));
-        li.addEventListener('mouseenter', () => previewMove(index + 1));
-        li.addEventListener('mouseleave', clearPreview);
-        reviewMoveListEl.appendChild(li);
+        button.addEventListener('click', () => jumpToPly(index + 1));
+        button.addEventListener('mouseenter', () => previewMove(index + 1));
+        button.addEventListener('mouseleave', clearPreview);
+        fragment.appendChild(li);
     });
+
+    reviewMoveListEl.appendChild(fragment);
 
     scheduleBoardResize();
 }
@@ -340,6 +380,10 @@ function setAnalysisStatus(status) {
     analysisStatus = status || '';
     if (engineStatusEl) {
         engineStatusEl.textContent = status || 'Waiting';
+    }
+    if (reviewEnginePanelEl) {
+        const busy = Boolean(status && status !== 'Stockfish review complete' && status !== 'Stockfish unavailable');
+        reviewEnginePanelEl.setAttribute('aria-busy', busy ? 'true' : 'false');
     }
     updateProgress();
 }
@@ -549,13 +593,21 @@ function updateEvalUI() {
     if (!evalScoreEl) return;
     const value = Number.isFinite(evalSeries[displayPly]) ? evalSeries[displayPly] : 0;
     evalScoreEl.textContent = formatEvalCp(value);
+    evalScoreEl.setAttribute('aria-label', `Evaluation ${formatEvalCp(value)}`);
     if (evalTextEl) {
         evalTextEl.textContent = `Eval ${formatEvalCp(value)}`;
     }
     if (!evalBarEl || !evalFillEl || !evalMarkerEl) return;
 
     const maxCp = 1000;
-    const normalized = (clampToBound(value, -maxCp, maxCp) + maxCp) / (2 * maxCp);
+    const bounded = clampToBound(value, -maxCp, maxCp);
+    evalBarEl.setAttribute('aria-valuenow', `${Math.round(bounded)}`);
+    evalBarEl.setAttribute('aria-valuetext', formatEvalCp(value));
+    if (evalGraphEl) {
+        evalGraphEl.setAttribute('aria-label', `Evaluation graph, current ${formatEvalCp(value)}`);
+    }
+
+    const normalized = (bounded + maxCp) / (2 * maxCp);
     const isHorizontal = evalBarEl.clientWidth > evalBarEl.clientHeight;
 
     if (isHorizontal) {
@@ -865,7 +917,8 @@ function renderBoard(lastMoveInfo) {
         const img = document.createElement('img');
         img.className = `piece piece-${piece.color}`;
         img.src = pieceIcons[`${piece.color}${piece.type}`];
-        img.alt = `${piece.color === 'w' ? 'White' : 'Black'} ${piece.type}`;
+        const pieceName = pieceNames[piece.type] || piece.type;
+        img.alt = `${piece.color === 'w' ? 'White' : 'Black'} ${pieceName}`;
         img.draggable = false;
         square.appendChild(img);
     });
@@ -896,6 +949,10 @@ function renderMoveSelection() {
         const ply = Number(item.dataset.ply);
         item.classList.toggle('active', ply === currentPly);
         item.classList.toggle('preview', previewPly !== null && ply === displayPly);
+        const button = item.querySelector('.review-nav-button');
+        if (button) {
+            button.setAttribute('aria-current', ply === currentPly ? 'true' : 'false');
+        }
     });
 
     const target = reviewMoveListEl.querySelector(previewPly !== null ? '.review-nav-move.preview' : '.review-nav-move.active');
@@ -919,6 +976,12 @@ function updateControlStates() {
     if (nextMoveBtn) nextMoveBtn.disabled = !hasMoves || currentPly >= moves.length;
     if (lastMoveBtn) lastMoveBtn.disabled = !hasMoves || currentPly >= moves.length;
     if (playPauseBtn) playPauseBtn.disabled = !hasMoves;
+    if (firstMoveBtn) firstMoveBtn.setAttribute('aria-disabled', String(firstMoveBtn.disabled));
+    if (prevMoveBtn) prevMoveBtn.setAttribute('aria-disabled', String(prevMoveBtn.disabled));
+    if (nextMoveBtn) nextMoveBtn.setAttribute('aria-disabled', String(nextMoveBtn.disabled));
+    if (lastMoveBtn) lastMoveBtn.setAttribute('aria-disabled', String(lastMoveBtn.disabled));
+    if (playPauseBtn) playPauseBtn.setAttribute('aria-disabled', String(playPauseBtn.disabled));
+    setPlayPauseState(Boolean(autoplayTimer));
 }
 
 function clampToBound(value, min, max) {
@@ -981,9 +1044,7 @@ function toggleAutoplay() {
         jumpToPly(currentPly + 1);
     }, 800);
 
-    if (playPauseBtn) {
-        playPauseBtn.textContent = 'Pause';
-    }
+    setPlayPauseState(true);
 }
 
 function stopAutoplay() {
@@ -991,9 +1052,15 @@ function stopAutoplay() {
         clearInterval(autoplayTimer);
         autoplayTimer = null;
     }
-    if (playPauseBtn) {
-        playPauseBtn.textContent = 'Play';
-    }
+    setPlayPauseState(false);
+}
+
+function setPlayPauseState(isPlaying) {
+    if (!playPauseBtn) return;
+    playPauseBtn.textContent = isPlaying ? 'Pause' : 'Play';
+    playPauseBtn.setAttribute('aria-pressed', isPlaying ? 'true' : 'false');
+    playPauseBtn.setAttribute('aria-label', isPlaying ? 'Pause autoplay' : 'Play moves');
+    playPauseBtn.classList.toggle('is-playing', isPlaying);
 }
 
 function capitalize(value) {
