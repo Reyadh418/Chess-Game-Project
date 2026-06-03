@@ -5,13 +5,14 @@ A polished browser chess experience with Player vs AI and pass-and-play modes. B
 ## Features
 - **Game modes:** Player vs AI or local pass & play.
 - **AI levels:** Easy (random), Medium/Hard powered by Stockfish (browser worker) with a built-in minimax fallback if Stockfish cannot load.
-- **Post-game review:** Automatic Stockfish analysis after checkmate/stalemate/time loss in both AI and pass & play, including best-move recommendations and move quality badges (Best, Excellent, Good, Inaccuracy, Mistake, Blunder).
+- **Post-game review:** Automatic Stockfish analysis after checkmate/stalemate/time loss in both AI and pass & play, including best-move recommendations, engine lines, evaluation rail/graph, and move quality badges (Best, Excellent, Good, Inaccuracy, Mistake, Blunder).
+- **Review controls:** First/prev/next/last navigation, autoplay, and keyboard shortcuts (Left/Right, Home/End, Space).
 - **Two-page flow:** Homepage is pre-game setup only (mode, time, theme). Matches always run in the full-screen match page.
 - **Time controls:** Untimed, 3:00, or 10:00 per side with flag-fall detection.
 - **Focus Mode:** Distraction-free view with clocks, captured pieces, move list, and exit button.
 - **Board skins & unlocks:** 10 themes; 1 is free, and the rest unlock as you beat the AI (progress stored in localStorage under `aurumUnlocks`).
 - **Quality-of-life:** Undo, move list with castles/promotions, captured pieces tray, status/check highlights, toast notifications, subtle sounds, and a mute toggle for audio.
-- **Accessibility polish:** Keyboard-friendly board navigation, clearer button labels, live status updates, and stronger focus styles for easier use on desktop and assistive devices.
+- **Accessibility polish:** Keyboard-friendly board navigation and review controls, clearer button labels, live status updates, and stronger focus styles for easier use on desktop and assistive devices.
 
 ## Getting Started
 1) Clone or download this repository.
@@ -34,17 +35,20 @@ If you run into file system and storage/audio permission issues, open via a simp
 - **Undo:** Reverts the last full turn; in AI mode, undo twice rolls back both sides.
 - **Time controls:** Select before starting; timers auto-start on the first move. Flag ends the game.
 - **Match page:** Gameplay runs only in the dedicated match page. After game end, **Review Game** and **Exit Match** appear.
+- **Review page:** Use the control bar or keyboard shortcuts (Left/Right, Home/End, Space) to step through analyzed moves.
 - **Audio:** Use the **Mute sounds** button in the match page if you want to turn off move effects.
 - **Unlocks:** Win vs AI as White to increment your unlocked theme count (max 10). Reset via **Reset Unlocks**.
 
 ## Files
 - `index.html` — setup homepage (mode, difficulty, time, themes).
 - `focus.html` — dedicated full-screen match page.
+- `review.html` — post-game review page and move explorer.
 - `styles/main.css` — glassy UI, board/piece styling, focus mode, toasts.
 - `js/home.js` — homepage setup logic and match settings persistence.
 - `js/app.js` — UI wiring, game flow, timers, focus mode, unlock logic, sounds.
 - `js/ai.js` — AI move selection with Stockfish UCI worker integration plus minimax fallback.
 - `js/chessEngine.js` — chess rules, move history, and FEN export for external engine analysis.
+- `js/review.js` — review page rendering, engine analysis, evaluation graph, and move navigation.
 
 ## Notes
 - Progress is stored locally; clearing site data resets unlocks.
