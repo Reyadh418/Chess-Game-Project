@@ -32,11 +32,49 @@ body {
     overflow-x: hidden;
 }
 
+body.home-page-body {
+    padding: 16px;
+    overflow: auto;
+    background:
+        radial-gradient(circle at 15% 10%, rgba(255, 214, 150, 0.14), transparent 35%),
+        radial-gradient(circle at 88% 12%, rgba(90, 208, 255, 0.14), transparent 32%),
+        linear-gradient(160deg, #09111f 0%, #050914 45%, #03060e 100%);
+    position: relative;
+    isolation: isolate;
+}
+
+body.home-page-body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+    background-size: 36px 36px;
+    opacity: 0.45;
+    pointer-events: none;
+    z-index: -1;
+}
+
+body.home-page-body::after {
+    content: '';
+    position: fixed;
+    right: -180px;
+    top: -170px;
+    width: 420px;
+    height: 420px;
+    background: radial-gradient(circle, rgba(255, 214, 150, 0.18), transparent 62%);
+    filter: blur(2px);
+    pointer-events: none;
+    z-index: -1;
+}
+
 .hero-grid {
-    max-width: 1400px;
+    max-width: 1180px;
     margin: 0 auto;
     display: grid;
     gap: 18px;
+    position: relative;
+    z-index: 1;
 }
 
 .topbar {
@@ -44,10 +82,10 @@ body {
     align-items: center;
     justify-content: space-between;
     padding: 18px 20px;
-    border: 1px solid var(--stroke);
-    border-radius: 16px;
-    background: linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01));
-    box-shadow: var(--glow), var(--shadow);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 18px;
+    background: linear-gradient(160deg, rgba(12, 18, 32, 0.94), rgba(6, 10, 18, 0.98));
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.02) inset;
 }
 
 h1 {
@@ -382,6 +420,10 @@ button.resign {
 
 .home-layout .panel.controls {
     width: 100%;
+    border-radius: 18px;
+    background: linear-gradient(160deg, rgba(12, 18, 32, 0.94), rgba(6, 10, 18, 0.98));
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
 }
 
 .panel {
@@ -471,7 +513,10 @@ button.resign {
     align-items: center;
     grid-template-columns: 36px 1fr;
     grid-template-rows: auto auto;
-    background: rgba(255, 255, 255, 0.03);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .theme-card .swatch {
