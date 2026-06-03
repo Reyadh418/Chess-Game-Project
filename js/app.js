@@ -332,7 +332,6 @@ function setMode(nextMode) {
 
 function renderThemes() {
     if (!themeTemplate || !themeGrid) {
-        console.warn('Theme template missing in DOM');
         return;
     }
     if (activeTheme + 1 > unlockCount) {

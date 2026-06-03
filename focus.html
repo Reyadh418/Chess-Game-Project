@@ -11,14 +11,21 @@
 </head>
 <body class="focus-active">
     <div class="focus-layout active" id="focusLayout">
-        <div class="focus-board-area">
+        <section class="focus-board-area panel" aria-label="Live board">
+            <header class="focus-head">
+                <div>
+                    <p class="eyebrow">Live Match</p>
+                    <h1 class="focus-title">Match Console</h1>
+                </div>
+                <span class="focus-chip">Aurum Chess</span>
+            </header>
             <div class="board-shell" id="focusBoardShell">
                 <div class="board" id="focusBoard"></div>
                 <div class="board-overlay"></div>
             </div>
-        </div>
+        </section>
 
-        <div class="focus-center">
+        <aside class="focus-center panel" aria-label="Match status and clocks">
             <div class="focus-clock">
                 <span class="tag">Black</span>
                 <span class="time" id="focusTimeBlack">--:--</span>
@@ -40,9 +47,9 @@
                 <span class="tag">White</span>
                 <span class="time" id="focusTimeWhite">--:--</span>
             </div>
-        </div>
+        </aside>
 
-        <div class="focus-right panel">
+        <aside class="focus-right panel" aria-label="Move list and actions">
             <div class="focus-action-row">
                 <button id="muteToggleBtn" class="ghost" type="button" aria-pressed="false">Mute sounds</button>
             </div>
@@ -67,7 +74,7 @@
                 <button class="ghost exit-focus-btn post-match-action" id="exitFocusBtn" type="button" aria-label="Exit the match page">Exit Match</button>
             </div>
             <button id="newGameBtn" class="primary" type="button" aria-label="Start a fresh match">New Match</button>
-        </div>
+        </aside>
     </div>
 
     <div id="toastContainer" class="toast-container" aria-live="polite"></div>
