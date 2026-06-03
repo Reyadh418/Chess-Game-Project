@@ -592,17 +592,23 @@ function getLineDepth(analysis) {
 function updateEvalUI() {
     if (!evalScoreEl) return;
     const value = Number.isFinite(evalSeries[displayPly]) ? evalSeries[displayPly] : 0;
-    evalScoreEl.textContent = formatEvalCp(value);
-    evalScoreEl.setAttribute('aria-label', `Evaluation ${formatEvalCp(value)}`);
+    const side = value > 20 ? 'white' : value < -20 ? 'black' : 'balanced';
+    const summary = value > 20 ? 'White edge' : value < -20 ? 'Black edge' : 'Balanced';
+
+    evalScoreEl.textContent = `${formatEvalCp(value)} • ${summary}`;
+    evalScoreEl.classList.toggle('positive', value > 0);
+    evalScoreEl.classList.toggle('negative', value < 0);
+    evalScoreEl.setAttribute('aria-label', `Evaluation ${formatEvalCp(value)}; ${summary}`);
     if (evalTextEl) {
-        evalTextEl.textContent = `Eval ${formatEvalCp(value)}`;
+        evalTextEl.textContent = `Eval ${formatEvalCp(value)} (${summary})`;
     }
     if (!evalBarEl || !evalFillEl || !evalMarkerEl) return;
 
     const maxCp = 1000;
     const bounded = clampToBound(value, -maxCp, maxCp);
+    evalBarEl.dataset.side = side;
     evalBarEl.setAttribute('aria-valuenow', `${Math.round(bounded)}`);
-    evalBarEl.setAttribute('aria-valuetext', formatEvalCp(value));
+    evalBarEl.setAttribute('aria-valuetext', `${formatEvalCp(value)} (${summary})`);
     if (evalGraphEl) {
         evalGraphEl.setAttribute('aria-label', `Evaluation graph, current ${formatEvalCp(value)}`);
     }
