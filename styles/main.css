@@ -2046,3 +2046,26 @@ body.focus-active .hero-grid {
         gap: 4px;
     }
 }
+
+/* ── Board particle effects and sandbox styles ── */
+.board-particles-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.sandbox-active {
+    box-shadow: 0 0 22px rgba(126, 243, 198, 0.5) !important;
+    border: 2px solid rgba(126, 243, 198, 0.7) !important;
+}
+
+#sandboxToggleBtn.active {
+    background: rgba(126, 243, 198, 0.22) !important;
+    border-color: rgba(126, 243, 198, 0.5) !important;
+    color: #bfffe8 !important;
+    box-shadow: 0 0 12px rgba(126, 243, 198, 0.2);
+}

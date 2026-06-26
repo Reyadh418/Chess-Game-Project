@@ -98,6 +98,13 @@ let arrowScale = 1;
 let evalGraphScale = 1;
 let evalGraphSize = { width: 0, height: 0 };
 
+let sandboxMode = false;
+let sandboxSelectedSquare = null;
+let sandboxLegalMovesCache = [];
+let sandboxDragSourceSquare = null;
+let sandboxAnalysisToken = 0;
+let reviewAudioCtx = null;
+
 function init() {
     boardEl = document.getElementById('reviewBoard');
     boardShellEl = document.getElementById('reviewBoardShell');
@@ -142,6 +149,11 @@ function bindControls() {
         backToMatchBtn.addEventListener('click', () => {
             window.location.href = 'focus.html';
         });
+    }
+
+    const sandboxToggleBtn = document.getElementById('sandboxToggleBtn');
+    if (sandboxToggleBtn) {
+        sandboxToggleBtn.addEventListener('click', toggleSandboxMode);
     }
 
     if (firstMoveBtn) firstMoveBtn.addEventListener('click', () => jumpToPly(0));
@@ -267,9 +279,16 @@ function buildBoard() {
     boardEl.innerHTML = '';
     for (let row = 0; row < 8; row++) {
         for (let col = 0; col < 8; col++) {
-            const square = document.createElement('div');
+            const square = document.createElement('button');
+            square.type = 'button';
             square.className = `square ${(row + col) % 2 === 0 ? 'light' : 'dark'}`;
             square.dataset.square = engine.coordsToSquare(row, col);
+            square.setAttribute('aria-roledescription', 'chess square');
+            square.setAttribute('aria-label', square.dataset.square);
+            square.addEventListener('click', () => onSandboxSquareClick(square.dataset.square));
+            square.addEventListener('dragover', onSandboxSquareDragOver);
+            square.addEventListener('dragleave', onSandboxSquareDragLeave);
+            square.addEventListener('drop', onSandboxSquareDrop);
             boardEl.appendChild(square);
         }
     }
@@ -771,6 +790,8 @@ function redrawBoardOverlays() {
     const height = arrowCanvasEl.height / arrowScale;
     ctx.clearRect(0, 0, width, height);
 
+    if (sandboxMode) return;
+
     if (!moves.length || displayPly <= 0) return;
     const row = analysisResults.get(displayPly);
     if (!row) return;
@@ -849,6 +870,17 @@ function getSquareCenter(square) {
 }
 
 function jumpToPly(nextPly) {
+    if (sandboxMode) {
+        sandboxMode = false;
+        const titleEl = document.getElementById('reviewTitle');
+        const toggleBtn = document.getElementById('sandboxToggleBtn');
+        if (titleEl) titleEl.textContent = 'Move Explorer';
+        if (toggleBtn) {
+            toggleBtn.textContent = 'Sandbox Mode';
+            toggleBtn.classList.remove('active');
+        }
+        boardShellEl.classList.remove('sandbox-active');
+    }
     setDisplayPly(nextPly, true);
 }
 
@@ -925,7 +957,11 @@ function renderBoard(lastMoveInfo) {
         img.src = pieceIcons[`${piece.color}${piece.type}`];
         const pieceName = pieceNames[piece.type] || piece.type;
         img.alt = `${piece.color === 'w' ? 'White' : 'Black'} ${pieceName}`;
-        img.draggable = false;
+        img.draggable = sandboxMode;
+        if (sandboxMode) {
+            img.addEventListener('dragstart', onSandboxPieceDragStart);
+            img.addEventListener('dragend', onSandboxPieceDragEnd);
+        }
         square.appendChild(img);
     });
 
@@ -1079,6 +1115,379 @@ function formatTimeControl(value) {
     if (value === '180') return '3:00';
     if (value === '600') return '10:00';
     return value;
+}
+
+/* ── Interactive Sandbox Mode ── */
+function toggleSandboxMode() {
+    sandboxMode = !sandboxMode;
+    sandboxSelectedSquare = null;
+    sandboxLegalMovesCache = [];
+    sandboxDragSourceSquare = null;
+
+    const titleEl = document.getElementById('reviewTitle');
+    const toggleBtn = document.getElementById('sandboxToggleBtn');
+
+    if (sandboxMode) {
+        if (titleEl) titleEl.textContent = 'Move Explorer (Sandbox)';
+        if (toggleBtn) {
+            toggleBtn.textContent = 'Exit Sandbox';
+            toggleBtn.classList.add('active');
+        }
+        if (boardShellEl) boardShellEl.classList.add('sandbox-active');
+        stopAutoplay();
+        sandboxLegalMovesCache = engine.generateLegalMoves(engine.turn);
+        runSandboxAnalysis();
+    } else {
+        if (titleEl) titleEl.textContent = 'Move Explorer';
+        if (toggleBtn) {
+            toggleBtn.textContent = 'Sandbox Mode';
+            toggleBtn.classList.remove('active');
+        }
+        if (boardShellEl) boardShellEl.classList.remove('sandbox-active');
+        jumpToPly(currentPly);
+    }
+
+    renderBoard();
+    clearSandboxHighlights();
+}
+
+function onSandboxSquareClick(square) {
+    if (!sandboxMode) return;
+
+    const { row, col } = engine.squareToCoords(square);
+    const piece = engine.getPiece(row, col);
+
+    if (sandboxSelectedSquare === square) {
+        clearSandboxHighlights();
+        sandboxSelectedSquare = null;
+        return;
+    }
+
+    if (sandboxSelectedSquare) {
+        const move = sandboxLegalMovesCache.find(
+            m => engine.coordsToSquare(m.from.row, m.from.col) === sandboxSelectedSquare
+                 && engine.coordsToSquare(m.to.row, m.to.col) === square
+        );
+        if (move) {
+            applySandboxMove(move);
+            return;
+        }
+    }
+
+    if (piece && piece.color === engine.turn) {
+        sandboxSelectedSquare = square;
+        showSandboxHighlights(square);
+    } else {
+        clearSandboxHighlights();
+        sandboxSelectedSquare = null;
+    }
+}
+
+function showSandboxHighlights(square) {
+    clearSandboxHighlights();
+    sandboxLegalMovesCache = engine.generateLegalMoves(engine.turn);
+    const pieceMoves = sandboxLegalMovesCache.filter(
+        m => engine.coordsToSquare(m.from.row, m.from.col) === square
+    );
+
+    const squareEl = boardEl.querySelector(`[data-square="${square}"]`);
+    if (squareEl) squareEl.classList.add('selected');
+
+    pieceMoves.forEach(m => {
+        const target = engine.coordsToSquare(m.to.row, m.to.col);
+        const targetEl = boardEl.querySelector(`[data-square="${target}"]`);
+        if (targetEl) {
+            targetEl.classList.add('highlight-move');
+            if (engine.getPiece(m.to.row, m.to.col)) {
+                targetEl.classList.add('capture');
+            }
+        }
+    });
+}
+
+function clearSandboxHighlights() {
+    if (!boardEl) return;
+    boardEl.querySelectorAll('.square').forEach(sq => {
+        sq.classList.remove('selected', 'highlight-move', 'capture', 'drag-over', 'drop-ready');
+    });
+}
+
+function onSandboxPieceDragStart(event) {
+    if (!sandboxMode) {
+        event.preventDefault();
+        return;
+    }
+    const pieceEl = event.target;
+    const squareEl = pieceEl && pieceEl.parentElement;
+    const fromSquare = squareEl && squareEl.dataset ? squareEl.dataset.square : null;
+    if (!fromSquare) {
+        event.preventDefault();
+        return;
+    }
+
+    const { row, col } = engine.squareToCoords(fromSquare);
+    const piece = engine.getPiece(row, col);
+    if (!piece || piece.color !== engine.turn) {
+        event.preventDefault();
+        return;
+    }
+
+    sandboxDragSourceSquare = fromSquare;
+    sandboxSelectedSquare = fromSquare;
+    showSandboxHighlights(fromSquare);
+    if (pieceEl) pieceEl.classList.add('dragging');
+    if (squareEl) squareEl.classList.add('dragging-source');
+
+    if (event.dataTransfer) {
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', fromSquare);
+    }
+}
+
+function onSandboxPieceDragEnd(event) {
+    const pieceEl = event.target;
+    if (pieceEl) pieceEl.classList.remove('dragging');
+    const squareEl = pieceEl && pieceEl.parentElement;
+    if (squareEl) squareEl.classList.remove('dragging-source');
+    sandboxDragSourceSquare = null;
+    clearSandboxDragOverStates();
+}
+
+function onSandboxSquareDragOver(event) {
+    if (!sandboxDragSourceSquare || !sandboxMode) return;
+    event.preventDefault();
+
+    const targetSquare = event.currentTarget && event.currentTarget.dataset
+        ? event.currentTarget.dataset.square
+        : null;
+    if (!targetSquare) return;
+
+    const hasLegalMove = sandboxLegalMovesCache.some(
+        m => engine.coordsToSquare(m.from.row, m.from.col) === sandboxDragSourceSquare
+            && engine.coordsToSquare(m.to.row, m.to.col) === targetSquare
+    );
+
+    if (hasLegalMove) {
+        event.currentTarget.classList.add('drag-over');
+        event.currentTarget.classList.add('drop-ready');
+    }
+}
+
+function onSandboxSquareDragLeave(event) {
+    if (!event.currentTarget) return;
+    event.currentTarget.classList.remove('drag-over');
+    event.currentTarget.classList.remove('drop-ready');
+}
+
+function onSandboxSquareDrop(event) {
+    if (!sandboxDragSourceSquare || !sandboxMode) return;
+    event.preventDefault();
+
+    const targetSquare = event.currentTarget && event.currentTarget.dataset
+        ? event.currentTarget.dataset.square
+        : null;
+    const fromSquare = sandboxDragSourceSquare;
+    sandboxDragSourceSquare = null;
+    clearSandboxDragOverStates();
+
+    if (!targetSquare) return;
+
+    const move = sandboxLegalMovesCache.find(
+        m => engine.coordsToSquare(m.from.row, m.from.col) === fromSquare
+            && engine.coordsToSquare(m.to.row, m.to.col) === targetSquare
+    );
+
+    if (move) {
+        applySandboxMove(move);
+    } else {
+        clearSandboxHighlights();
+        sandboxSelectedSquare = null;
+    }
+}
+
+function clearSandboxDragOverStates() {
+    if (!boardEl) return;
+    boardEl.querySelectorAll('.square').forEach(sq => {
+        sq.classList.remove('drag-over', 'drop-ready');
+    });
+}
+
+function applySandboxMove(move) {
+    const fromSq = engine.coordsToSquare(move.from.row, move.from.col);
+    const toSq = engine.coordsToSquare(move.to.row, move.to.col);
+
+    const capturedPiece = engine.getPiece(move.to.row, move.to.col);
+    let epCaptured = null;
+    if (move.enPassantCapture) {
+        const dir = engine.turn === 'w' ? 1 : -1;
+        epCaptured = engine.getPiece(move.to.row + dir, move.to.col);
+    }
+    const taken = capturedPiece || epCaptured;
+
+    engine.applyMove(move);
+    sandboxSelectedSquare = null;
+    clearSandboxHighlights();
+
+    if (taken) {
+        playSandboxSound('capture');
+    } else {
+        playSandboxSound('move');
+    }
+
+    const lastMoveInfo = {
+        from: fromSq,
+        to: toSq,
+        captured: taken
+    };
+    renderBoard(lastMoveInfo);
+
+    const kingPos = engine.findKing(engine.turn);
+    if (kingPos && engine.isInCheck(engine.turn)) {
+        playSandboxSound('check');
+    }
+
+    if (reviewProgressTextEl) {
+        reviewProgressTextEl.textContent = `Sandbox Mode | Turn: ${engine.turn === 'w' ? 'White' : 'Black'}`;
+    }
+
+    runSandboxAnalysis();
+}
+
+async function runSandboxAnalysis() {
+    const token = ++sandboxAnalysisToken;
+    setAnalysisStatus('Stockfish analyzing sandbox...');
+
+    if (bestLineEl) bestLineEl.textContent = 'Best: analyzing sandbox...';
+    if (altLineEl) altLineEl.textContent = 'Alt: analyzing sandbox...';
+
+    try {
+        const fen = engine.getFen();
+        const post = await reviewEngine.analyzePosition(fen, { moveTimeMs: 800, skillLevel: 20, multiPv: 2 });
+        if (token !== sandboxAnalysisToken || !sandboxMode) return;
+
+        const evalWhite = evalForWhite(post.scoreCp, fen);
+        const bestLine = getLineMoves(post, 0);
+        const altLine = getLineMoves(post, 1);
+        const depth = getLineDepth(post);
+
+        updateSandboxEvalUI(evalWhite, fen);
+
+        if (bestLineEl) {
+            bestLineEl.textContent = `Best: ${bestLine && bestLine.length ? formatUciLine(bestLine) : (post.bestMove ? formatUciMoveShort(post.bestMove) : '--')}`;
+        }
+        if (altLineEl) {
+            altLineEl.textContent = `Alt: ${altLine && altLine.length ? formatUciLine(altLine) : '--'}`;
+        }
+        if (depthTextEl) {
+            depthTextEl.textContent = depth ? `Depth ${depth}` : 'Depth --';
+        }
+
+        const sandboxRow = {
+            bestUci: post.bestMove || '',
+            altLine: altLine,
+            bestLine: bestLine,
+        };
+
+        if (arrowCanvasEl) {
+            const ctx = arrowCanvasEl.getContext('2d');
+            if (ctx) {
+                const width = arrowCanvasEl.width / arrowScale;
+                const height = arrowCanvasEl.height / arrowScale;
+                ctx.clearRect(0, 0, width, height);
+                drawMoveArrows(sandboxRow);
+            }
+        }
+
+        setAnalysisStatus('Sandbox analysis complete');
+    } catch (err) {
+        console.warn('Sandbox analysis error', err);
+        setAnalysisStatus('Stockfish unavailable');
+    }
+}
+
+function updateSandboxEvalUI(value, fen) {
+    if (!evalScoreEl) return;
+    const side = value > 20 ? 'white' : value < -20 ? 'black' : 'balanced';
+    const summary = value > 20 ? 'White edge' : value < -20 ? 'Black edge' : 'Balanced';
+
+    evalScoreEl.textContent = `${formatEvalCp(value)} • ${summary}`;
+    evalScoreEl.classList.toggle('positive', value > 0);
+    evalScoreEl.classList.toggle('negative', value < 0);
+    evalScoreEl.setAttribute('aria-label', `Evaluation ${formatEvalCp(value)}; ${summary}`);
+
+    if (evalTextEl) {
+        evalTextEl.textContent = `Eval ${formatEvalCp(value)} (${summary})`;
+    }
+
+    if (!evalBarEl || !evalFillEl || !evalMarkerEl) return;
+
+    const maxCp = 1000;
+    const bounded = clampToBound(value, -maxCp, maxCp);
+    evalBarEl.dataset.side = side;
+    evalBarEl.setAttribute('aria-valuenow', `${Math.round(bounded)}`);
+    evalBarEl.setAttribute('aria-valuetext', `${formatEvalCp(value)} (${summary})`);
+
+    const normalized = (bounded + maxCp) / (2 * maxCp);
+    const isHorizontal = evalBarEl.clientWidth > evalBarEl.clientHeight;
+
+    if (isHorizontal) {
+        evalFillEl.style.width = `${(normalized * 100).toFixed(2)}%`;
+        evalFillEl.style.height = '100%';
+        evalMarkerEl.style.left = `${(normalized * 100).toFixed(2)}%`;
+        evalMarkerEl.style.top = '50%';
+        evalMarkerEl.style.transform = 'translate(-50%, -50%)';
+    } else {
+        evalFillEl.style.height = `${(normalized * 100).toFixed(2)}%`;
+        evalFillEl.style.width = '100%';
+        evalMarkerEl.style.top = `${((1 - normalized) * 100).toFixed(2)}%`;
+        evalMarkerEl.style.left = '50%';
+        evalMarkerEl.style.transform = 'translate(-50%, -50%)';
+    }
+}
+
+function ensureReviewAudio() {
+    if (!reviewAudioCtx) {
+        reviewAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (reviewAudioCtx.state === 'suspended') {
+        reviewAudioCtx.resume();
+    }
+    return reviewAudioCtx;
+}
+
+function playReviewTone({ freq = 440, duration = 0.12, volume = 0.15, type = 'sine' }) {
+    try {
+        const ctx = ensureReviewAudio();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = type;
+        osc.frequency.value = freq;
+        gain.gain.value = volume;
+        osc.connect(gain).connect(ctx.destination);
+        const now = ctx.currentTime;
+        gain.gain.setValueAtTime(volume, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+        osc.start(now);
+        osc.stop(now + duration + 0.02);
+    } catch (err) {
+        console.warn('Audio playback failed', err);
+    }
+}
+
+function playSandboxSound(kind) {
+    const audioMuted = localStorage.getItem('aurumAudioMuted') === 'true';
+    if (audioMuted) return;
+
+    const sounds = {
+        move: () => playReviewTone({ freq: 540, duration: 0.09, volume: 0.12, type: 'sine' }),
+        capture: () => {
+            playReviewTone({ freq: 360, duration: 0.12, volume: 0.16, type: 'square' });
+            setTimeout(() => playReviewTone({ freq: 280, duration: 0.08, volume: 0.12, type: 'square' }), 40);
+        },
+        check: () => playReviewTone({ freq: 880, duration: 0.14, volume: 0.14, type: 'triangle' }),
+    };
+    const fn = sounds[kind];
+    if (fn) fn();
 }
 
 window.addEventListener('DOMContentLoaded', init);

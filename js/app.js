@@ -103,6 +103,11 @@ let muteToggleBtn = null;
 let audioMuted = false;
 const AUDIO_SETTINGS_KEY = 'aurumAudioMuted';
 
+let particleCanvas = null;
+let particleCtx = null;
+let particles = [];
+let particleAnimFrame = null;
+
 const reviewEngine = new StockfishClient();
 
 const themes = [
@@ -190,6 +195,7 @@ function init() {
 
     buildBoard();
     buildFocusBoard();
+    initParticles();
     bindControls();
     renderThemes();
     selectTheme(activeTheme);
@@ -770,9 +776,10 @@ function applyMoveAndUpdate(move, actor) {
 
     switchTimer();
 
-    // audio feedback
+    // audio feedback and particles
     if (taken) {
         playSound('capture');
+        triggerCaptureParticles(move.to.row, move.to.col, taken.color);
     } else {
         playSound('move');
     }
@@ -795,6 +802,7 @@ function updateStatus(manualText) {
         stopTimer();
         showToast(msg, 'success');
         playSound('gameover');
+        triggerVictoryCelebration();
         if (mode === 'ai' && state.winner === 'w') {
             unlockCount = Math.min(10, unlockCount + 1);
             saveUnlocks();
@@ -813,6 +821,7 @@ function updateStatus(manualText) {
         stopTimer();
         showToast('Draw by stalemate', 'info');
         playSound('gameover');
+        triggerVictoryCelebration();
         gameResultText = 'Draw by stalemate';
         persistReviewSnapshot();
         updateReviewButtonState();
@@ -823,6 +832,10 @@ function updateStatus(manualText) {
         [statusText, focusStatusText].forEach(el => { if (el) el.textContent = `${turnLabel} is in check`; });
         if (!lastInCheck) {
             playSound('check');
+            const kingPos = engine.findKing(engine.turn);
+            if (kingPos) {
+                triggerCheckRipples(kingPos.row, kingPos.col);
+            }
         }
         lastInCheck = true;
     } else {
@@ -979,6 +992,7 @@ function handleFlagFall(color) {
     [statusText, focusStatusText].forEach(el => { if (el) el.textContent = msg; });
     showToast(msg, 'warn');
     playSound('gameover');
+    triggerVictoryCelebration();
     gameResultText = msg;
     persistReviewSnapshot();
     updateReviewButtonState();
@@ -1015,6 +1029,7 @@ function confirmResignMatch() {
     [statusText, focusStatusText].forEach(el => { if (el) el.textContent = msg; });
     showToast('Match resigned', 'warn');
     playSound('gameover');
+    triggerVictoryCelebration();
     gameResultText = msg;
     persistReviewSnapshot();
     updateReviewButtonState();
@@ -1598,6 +1613,202 @@ function toggleFocusMode(on) {
     }
     refreshBoard();
     updateClockDisplays();
+}
+
+/* ── Particle Effects System ── */
+function initParticles() {
+    particleCanvas = document.getElementById('focusParticlesCanvas');
+    if (!particleCanvas) return;
+    particleCtx = particleCanvas.getContext('2d');
+    resizeParticleCanvas();
+    window.addEventListener('resize', resizeParticleCanvas);
+
+    if (particleAnimFrame) {
+        cancelAnimationFrame(particleAnimFrame);
+    }
+    particleAnimFrame = requestAnimationFrame(updateAndDrawParticles);
+}
+
+function resizeParticleCanvas() {
+    if (!particleCanvas) return;
+    const rect = particleCanvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    particleCanvas.width = rect.width * dpr;
+    particleCanvas.height = rect.height * dpr;
+    if (particleCtx) {
+        particleCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+}
+
+function updateAndDrawParticles() {
+    if (!particleCanvas || !particleCtx) {
+        particleAnimFrame = requestAnimationFrame(updateAndDrawParticles);
+        return;
+    }
+
+    const width = particleCanvas.width / (window.devicePixelRatio || 1);
+    const height = particleCanvas.height / (window.devicePixelRatio || 1);
+
+    particleCtx.clearRect(0, 0, width, height);
+
+    for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.age += 16.67;
+        if (p.age >= p.life) {
+            particles.splice(i, 1);
+            continue;
+        }
+
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += p.gravity;
+        p.vx *= p.friction;
+        p.vy *= p.friction;
+
+        particleCtx.save();
+        const alpha = 1 - (p.age / p.life);
+
+        if (p.type === 'check-ring') {
+            particleCtx.strokeStyle = `rgba(255, 143, 163, ${alpha})`;
+            particleCtx.lineWidth = p.lineWidth || 2;
+            particleCtx.beginPath();
+            const radius = p.minRadius + (p.maxRadius - p.minRadius) * (p.age / p.life);
+            particleCtx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+            particleCtx.stroke();
+        } else if (p.type === 'confetti') {
+            particleCtx.fillStyle = p.color;
+            particleCtx.globalAlpha = alpha;
+            particleCtx.translate(p.x, p.y);
+            particleCtx.rotate(p.rotation);
+            p.rotation += p.rotSpeed;
+            particleCtx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+        } else {
+            particleCtx.fillStyle = p.color;
+            particleCtx.globalAlpha = alpha;
+            particleCtx.beginPath();
+            particleCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            particleCtx.fill();
+        }
+
+        particleCtx.restore();
+    }
+
+    particleAnimFrame = requestAnimationFrame(updateAndDrawParticles);
+}
+
+function triggerCaptureParticles(row, col, pieceColor) {
+    if (!particleCanvas) return;
+    const width = particleCanvas.width / (window.devicePixelRatio || 1);
+    const squareSize = width / 8;
+    const cx = (col + 0.5) * squareSize;
+    const cy = (row + 0.5) * squareSize;
+
+    const colors = pieceColor === 'w'
+        ? ['#ffffff', '#eef4ff', '#9fbdfc', '#7ef3c6']
+        : ['#ff8fa3', '#c9a6f7', '#3b0020', '#b073ff'];
+
+    for (let i = 0; i < 30; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 1.2 + Math.random() * 3.8;
+        particles.push({
+            type: 'sparkle',
+            x: cx,
+            y: cy,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed - 0.5,
+            gravity: 0.08,
+            friction: 0.95,
+            color: colors[Math.floor(Math.random() * colors.length)],
+            size: 1.5 + Math.random() * 3.0,
+            age: 0,
+            life: 350 + Math.random() * 400
+        });
+    }
+}
+
+function triggerCheckRipples(row, col) {
+    if (!particleCanvas) return;
+    const width = particleCanvas.width / (window.devicePixelRatio || 1);
+    const squareSize = width / 8;
+    const cx = (col + 0.5) * squareSize;
+    const cy = (row + 0.5) * squareSize;
+
+    for (let i = 0; i < 3; i++) {
+        setTimeout(() => {
+            if (gameOver) return;
+            particles.push({
+                type: 'check-ring',
+                x: cx,
+                y: cy,
+                vx: 0,
+                vy: 0,
+                gravity: 0,
+                friction: 1,
+                minRadius: 4,
+                maxRadius: squareSize * 1.05,
+                lineWidth: 3 - i * 0.5,
+                age: 0,
+                life: 550
+            });
+        }, i * 180);
+    }
+}
+
+function triggerVictoryCelebration() {
+    if (!particleCanvas) return;
+    const width = particleCanvas.width / (window.devicePixelRatio || 1);
+    const height = particleCanvas.height / (window.devicePixelRatio || 1);
+
+    const colors = ['#ffd700', '#7ef3c6', '#5ad0ff', '#ff8fa3', '#c9a6f7', '#ffffff'];
+
+    let sprays = 0;
+    const interval = setInterval(() => {
+        sprays++;
+        if (sprays > 12) {
+            clearInterval(interval);
+            return;
+        }
+
+        for (let i = 0; i < 8; i++) {
+            const angle = -Math.PI / 4 + (Math.random() - 0.5) * 0.25;
+            const speed = 4 + Math.random() * 6;
+            particles.push({
+                type: 'confetti',
+                x: 10,
+                y: height - 10,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                gravity: 0.14,
+                friction: 0.97,
+                color: colors[Math.floor(Math.random() * colors.length)],
+                size: 4 + Math.random() * 5,
+                rotation: Math.random() * Math.PI * 2,
+                rotSpeed: (Math.random() - 0.5) * 0.08,
+                age: 0,
+                life: 1400 + Math.random() * 600
+            });
+        }
+
+        for (let i = 0; i < 8; i++) {
+            const angle = -3 * Math.PI / 4 + (Math.random() - 0.5) * 0.25;
+            const speed = 4 + Math.random() * 6;
+            particles.push({
+                type: 'confetti',
+                x: width - 10,
+                y: height - 10,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                gravity: 0.14,
+                friction: 0.97,
+                color: colors[Math.floor(Math.random() * colors.length)],
+                size: 4 + Math.random() * 5,
+                rotation: Math.random() * Math.PI * 2,
+                rotSpeed: (Math.random() - 0.5) * 0.08,
+                age: 0,
+                life: 1400 + Math.random() * 600
+            });
+        }
+    }, 150);
 }
 
 window.addEventListener('DOMContentLoaded', () => {
