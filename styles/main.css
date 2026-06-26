@@ -646,6 +646,9 @@ button.resign {
     -webkit-tap-highlight-color: transparent;
     transition: background 0.2s ease, transform 0.1s ease;
     border-radius: 0;
+    border: none;
+    padding: 0;
+    margin: 0;
 }
 
 .square.light {
@@ -1121,6 +1124,7 @@ body.focus-active > .focus-layout.active {
 /* Left — board fills entire area as a square */
 .focus-board-area {
     flex: 1;
+    height: calc(100vh - 28px);
     display: grid;
     grid-template-rows: auto minmax(0, 1fr);
     gap: 12px;
@@ -1133,10 +1137,12 @@ body.focus-active > .focus-layout.active {
 }
 
 .focus-board-area .board-shell {
-    width: min(calc(100vh - 52px), calc(100vw - 430px));
+    width: auto;
+    height: auto;
     max-width: 100%;
-    height: min(calc(100vh - 52px), calc(100vw - 430px));
     max-height: 100%;
+    aspect-ratio: 1 / 1;
+    margin: auto;
     border-radius: 16px;
     border: 1px solid rgba(255, 255, 255, 0.12);
     background: rgba(0, 0, 0, 0.22);
@@ -1156,6 +1162,7 @@ body.focus-active > .focus-layout.active {
 .focus-center {
     width: 240px;
     min-width: 240px;
+    height: calc(100vh - 28px);
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -1217,17 +1224,30 @@ body.focus-active > .focus-layout.active {
 }
 
 /* Right — info + moves + exit */
-.focus-right {
+.focus-right-column {
     width: 320px;
     min-width: 320px;
+    height: calc(100vh - 28px);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    overflow: hidden;
+}
+
+.focus-right-top {
+    flex: 1;
+    height: 0;
     display: flex;
     flex-direction: column;
     gap: 12px;
     overflow: hidden;
-    border-radius: 18px;
-    background: linear-gradient(160deg, rgba(12, 18, 32, 0.94), rgba(6, 10, 18, 0.98));
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+    min-height: 0;
+}
+
+.focus-right-bottom {
+    display: grid;
+    gap: 12px;
+    flex-shrink: 0;
 }
 
 .focus-action-row {
@@ -1273,16 +1293,27 @@ body.focus-active > .focus-layout.active {
     gap: 10px;
 }
 
-.focus-right .move-list {
-    flex: 1;
-    max-height: none;
+.focus-top-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.focus-right-top .move-list {
+    margin: 12px 0 0;
+    padding-left: 20px;
     overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+    height: 0;
+    min-height: 0;
 }
 
 .focus-post-actions {
     display: none;
     gap: 10px;
-    margin-top: auto;
 }
 
 .focus-post-actions.visible {
@@ -1946,6 +1977,7 @@ body.focus-active .hero-grid {
     }
 
     .focus-board-area {
+        height: auto;
         min-height: 0;
         padding: 10px;
     }
@@ -1960,6 +1992,7 @@ body.focus-active .hero-grid {
     }
 
     .focus-center {
+        height: auto;
         flex-direction: row;
         flex-wrap: wrap;
         justify-content: stretch;
@@ -1977,13 +2010,19 @@ body.focus-active .hero-grid {
         min-width: 0;
     }
 
-    .focus-right {
-        padding: 12px;
+    .focus-right-column {
         gap: 10px;
-        overflow: visible;
+        height: auto;
     }
 
-    .focus-right .move-list {
+    .focus-right-top {
+        height: auto;
+        flex: none;
+    }
+
+    .focus-right-top .move-list {
+        height: auto;
+        flex: none;
         max-height: 260px;
     }
 
@@ -2029,8 +2068,7 @@ body.focus-active .hero-grid {
         display: none;
     }
 
-    .focus-right {
-        padding: 10px;
+    .focus-right-column {
         gap: 10px;
     }
 

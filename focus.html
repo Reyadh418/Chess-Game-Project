@@ -50,32 +50,39 @@
             </div>
         </aside>
 
-        <aside class="focus-right panel" aria-label="Move list and actions">
-            <div class="focus-action-row">
-                <button id="muteToggleBtn" class="ghost" type="button" aria-pressed="false">Mute sounds</button>
-            </div>
-            <div class="focus-info">
-                <div class="status">
-                    <p class="label">Status</p>
-                    <p class="value" id="focusStatusText" role="status" aria-live="polite">Ready</p>
+        <div class="focus-right-column">
+            <aside class="focus-right-top panel" aria-label="Move list and status">
+                <div class="focus-top-section">
+                    <div class="focus-action-row">
+                        <button id="muteToggleBtn" class="ghost" type="button" aria-pressed="false">Mute sounds</button>
+                    </div>
+                    <div class="focus-info">
+                        <div class="status">
+                            <p class="label">Status</p>
+                            <p class="value" id="focusStatusText" role="status" aria-live="polite">Ready</p>
+                        </div>
+                        <div class="status">
+                            <p class="label">Turn</p>
+                            <p class="value" id="focusTurnText" role="status" aria-live="polite">White</p>
+                        </div>
+                    </div>
+                    <div class="label-row">
+                        <p class="label">Move List</p>
+                        <button class="ghost" id="focusUndoBtn" type="button" aria-label="Undo last move">Undo</button>
+                    </div>
                 </div>
-                <div class="status">
-                    <p class="label">Turn</p>
-                    <p class="value" id="focusTurnText" role="status" aria-live="polite">White</p>
+                <ol id="focusMoveList" class="move-list"></ol>
+            </aside>
+            
+            <aside class="focus-right-bottom panel" aria-label="Match actions">
+                <button id="resignBtn" class="resign secondary" type="button" aria-label="Resign the current match">Resign Match</button>
+                <div class="focus-post-actions" id="focusPostActions">
+                    <button id="reviewGameBtn" class="ghost post-match-action" type="button" disabled aria-label="Open post-game review">Review Game</button>
+                    <button class="ghost exit-focus-btn post-match-action" id="exitFocusBtn" type="button" aria-label="Exit the match page">Exit Match</button>
                 </div>
-            </div>
-            <div class="label-row">
-                <p class="label">Move List</p>
-                <button class="ghost" id="focusUndoBtn" type="button" aria-label="Undo last move">Undo</button>
-            </div>
-            <ol id="focusMoveList" class="move-list"></ol>
-            <button id="resignBtn" class="resign secondary" type="button" aria-label="Resign the current match">Resign Match</button>
-            <div class="focus-post-actions" id="focusPostActions">
-                <button id="reviewGameBtn" class="ghost post-match-action" type="button" disabled aria-label="Open post-game review">Review Game</button>
-                <button class="ghost exit-focus-btn post-match-action" id="exitFocusBtn" type="button" aria-label="Exit the match page">Exit Match</button>
-            </div>
-            <button id="newGameBtn" class="primary" type="button" aria-label="Start a fresh match">New Match</button>
-        </aside>
+                <button id="newGameBtn" class="primary" type="button" aria-label="Start a fresh match">New Match</button>
+            </aside>
+        </div>
     </div>
 
     <div id="toastContainer" class="toast-container" aria-live="polite"></div>
